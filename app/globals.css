@@ -1312,6 +1312,6 @@ th {
 
 @media (max-width: 620px) {
   .movie-rail-shell {
-    --items-per-view: 3;
+    --items-per-view: 2;
   }
 }
