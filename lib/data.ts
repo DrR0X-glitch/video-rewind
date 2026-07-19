@@ -11,6 +11,8 @@ import {
   getRecentlyReturnedMoviesFromDatabase,
   getStockViewOptionsFromDatabase,
   getTopGenresFromDatabase,
+  listBrowseMoviesPageFromDatabase,
+  listInventoryTitlesPageFromDatabase,
   listBrowseMoviesFromDatabase,
   listInventoryTitlesFromDatabase,
   listStockDiscsFromDatabase,
@@ -94,6 +96,40 @@ export async function searchInventoryTitles(
   return listInventoryTitlesFromDatabase(query, limit);
 }
 
+export async function searchInventoryTitlesPage(
+  query?: string,
+  page?: number,
+  pageSize?: number,
+) {
+  return listInventoryTitlesPageFromDatabase(query, page, pageSize);
+}
+
+export async function filterMoviesPage(input: {
+  search?: string;
+  genre?: string;
+  decade?: string;
+  available?: string;
+  mediaType?: string;
+  excludeHomepageHidden?: boolean;
+  limit?: number;
+  page?: number;
+  pageSize?: number;
+  sort?: string;
+}) {
+  return listBrowseMoviesPageFromDatabase({
+    search: input.search,
+    genre: input.genre,
+    decade: input.decade,
+    available: input.available,
+    mediaType: input.mediaType,
+    excludeHomepageHidden: input.excludeHomepageHidden,
+    limit: input.limit,
+    page: input.page,
+    pageSize: input.pageSize,
+    sort: input.sort,
+  });
+}
+
 export async function getTmdbMovieDraft(input: string) {
   return fetchTmdbTitleDraft(input);
 }
@@ -110,6 +146,8 @@ export async function getAlphabeticalStockSections(input: {
 export async function listStockDiscs(input: {
   preset?: string;
   q?: string;
+  section?: string;
+  row?: string;
   availability?: string;
   edited?: string;
   formats?: string[];

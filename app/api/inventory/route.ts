@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-import { searchInventoryTitles } from "@/lib/data";
+import { searchInventoryTitlesPage } from "@/lib/data";
 import { createInventoryItemInDatabase } from "@/lib/server/store";
 import { ensureObject, jsonError, parseInteger } from "@/lib/server/http";
 
 export async function GET(request: NextRequest) {
   try {
     const query = request.nextUrl.searchParams.get("search")?.trim() || undefined;
-    const limit = parseInteger(request.nextUrl.searchParams.get("limit"), "limit") ?? undefined;
-    const results = await searchInventoryTitles(query, limit);
+    const page = parseInteger(request.nextUrl.searchParams.get("page"), "page") ?? undefined;
+    const pageSize = parseInteger(request.nextUrl.searchParams.get("pageSize"), "pageSize") ?? undefined;
+    const results = await searchInventoryTitlesPage(query, page, pageSize);
     return NextResponse.json(results);
   } catch (error) {
     return jsonError(error);

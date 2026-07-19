@@ -482,114 +482,52 @@ h2 {
 
 .about-page {
   display: grid;
-  gap: 1rem;
-}
-
-.about-panel {
-  position: relative;
-  overflow: hidden;
-  padding: 1.1rem 1.05rem 1rem;
+  gap: 0.65rem;
+  max-width: 860px;
+  margin: 0 auto;
 }
 
 .about-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 1rem;
-  align-items: start;
-  margin: -1.1rem -1.05rem 1rem;
-  padding: 1rem 1.05rem 1.1rem;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.5)),
-    repeating-linear-gradient(
-      90deg,
-      rgba(255, 122, 0, 0.09) 0 0.85rem,
-      rgba(17, 17, 17, 0.06) 0.85rem 1.15rem,
-      rgba(255, 227, 107, 0.1) 1.15rem 1.75rem
-    );
+  gap: 0.35rem;
+  padding: 0.35rem 0 0.8rem;
   border-bottom: 1px solid var(--brand-soft);
 }
 
-.about-hero-copy {
-  min-width: 0;
-}
-
 .about-deck {
-  max-width: 46rem;
+  max-width: 48rem;
   margin-bottom: 0;
-  font-size: 1.03rem;
+  font-size: 1.02rem;
 }
 
-.about-body {
+.about-section {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
-  align-items: start;
-}
-
-.about-column {
-  display: grid;
-  gap: 0.95rem;
-  font-size: 1rem;
-}
-
-.about-column p:last-child {
-  margin-bottom: 0;
+  gap: 0.55rem;
+  padding: 0.15rem 0 0.45rem;
+  border-bottom: 1px solid var(--border);
 }
 
 .about-lead {
-  font-size: 1.06rem;
-  line-height: 1.6;
+  font-size: 1.04rem;
+  line-height: 1.5;
+  margin-bottom: 0.15rem;
 }
 
 .about-closing {
   font-weight: 700;
 }
 
-.about-sticker {
-  display: grid;
-  gap: 0.05rem;
-  justify-items: center;
-  border: 2px solid #111;
-  background: linear-gradient(180deg, #ffe36b 0%, #f0b91e 100%);
-  padding: 0.8rem 0.65rem;
-  color: var(--brand);
-  font-family: Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;
-  font-size: 1.4rem;
-  line-height: 1.2;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  text-shadow:
-    -2px -2px 0 #111,
-    0 -2px 0 #111,
-    2px -2px 0 #111,
-    -2px 0 0 #111,
-    2px 0 0 #111,
-    -2px 2px 0 #111,
-    0 2px 0 #111,
-    2px 2px 0 #111;
-}
-
-.about-side-block {
-  border: 1px solid var(--border);
-  background: linear-gradient(180deg, rgba(255, 122, 0, 0.08), transparent 85%), var(--bg);
-  padding: 0.75rem;
-}
-
 .about-list {
   display: grid;
-  gap: 0.45rem;
+  gap: 0.3rem;
   padding-left: 1.1rem;
   margin-bottom: 0;
 }
 
 .about-quote {
   display: grid;
-  gap: 0.35rem;
-  margin-top: 1rem;
-  border: 2px solid var(--brand-soft);
-  background: linear-gradient(180deg, rgba(255, 122, 0, 0.1), transparent 70%);
-  padding: 0.85rem 0.95rem;
-  font-weight: 700;
+  gap: 0.25rem;
+  padding: 0.3rem 0 0.2rem;
 }
 
 .about-quote p {
@@ -602,6 +540,10 @@ h2 {
   font-size: 1.05rem;
   letter-spacing: 0.03em;
   text-transform: uppercase;
+}
+
+.about-link-row {
+  margin-bottom: 0;
 }
 
 .home-intro {
@@ -958,6 +900,10 @@ h2 {
 
 .bulk-action-field {
   min-width: 220px;
+}
+
+.stock-location-filter {
+  min-width: 88px;
 }
 
 .selection-column {

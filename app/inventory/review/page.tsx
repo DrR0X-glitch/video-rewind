@@ -5,18 +5,36 @@ import { ReviewBulkControls } from "@/components/review-bulk-controls";
 import { StockTableBody } from "@/components/stock-table-body";
 import { listStockDiscs } from "@/lib/data";
 
-const REVIEW_PAGE_SIZE = 10000;
+const REVIEW_PAGE_SIZE = 50;
 export const dynamic = "force-dynamic";
 
-export default async function InventoryReviewPage() {
+type ReviewPageProps = {
+  searchParams: Promise<{
+    page?: string;
+  }>;
+};
+
+export default async function InventoryReviewPage({ searchParams }: ReviewPageProps) {
+  const params = await searchParams;
+  const selectedPage =
+    typeof params.page === "string" && /^\d+$/.test(params.page) && Number.parseInt(params.page, 10) > 0
+      ? Number.parseInt(params.page, 10)
+      : 1;
   const stockPage = await listStockDiscs({
     reviewedState: "false",
     sort: "primary",
     dir: "desc",
-    page: 1,
+    page: selectedPage,
     pageSize: REVIEW_PAGE_SIZE,
   });
   const items = stockPage.items;
+  const totalCount = stockPage.totalCount;
+  const totalPages = Math.max(1, Math.ceil(totalCount / REVIEW_PAGE_SIZE));
+  const currentPage = Math.min(selectedPage, totalPages);
+  const pageStart = totalCount === 0 ? 0 : (currentPage - 1) * REVIEW_PAGE_SIZE + 1;
+  const pageEnd = totalCount === 0 ? 0 : pageStart + items.length - 1;
+  const previousPageHref = currentPage > 1 ? buildReviewHref(currentPage - 1) : null;
+  const nextPageHref = currentPage < totalPages ? buildReviewHref(currentPage + 1) : null;
   const bulkFormId = "review-bulk-form";
 
   return (
@@ -26,7 +44,7 @@ export default async function InventoryReviewPage() {
           <div>
             <h1>Review Queue</h1>
             <p className="muted utility-row">
-              {items.length === 0 ? "No discs waiting for review" : `${items.length} unreviewed discs`}
+              {totalCount === 0 ? "No discs waiting for review" : `Showing ${pageStart}-${pageEnd} of ${totalCount}`}
             </p>
           </div>
           <Link href="/inventory/stock">Back to Stock</Link>
@@ -63,10 +81,36 @@ export default async function InventoryReviewPage() {
             </table>
             <div className="section stock-table-footer">
               <ReviewBulkControls />
+              {totalPages > 1 ? (
+                <div className="header-actions stock-pagination">
+                  {previousPageHref ? (
+                    <Link href={previousPageHref}>Previous</Link>
+                  ) : (
+                    <span className="muted">Previous</span>
+                  )}
+                  <span className="muted">Page {currentPage} of {totalPages}</span>
+                  {nextPageHref ? (
+                    <Link href={nextPageHref}>Next</Link>
+                  ) : (
+                    <span className="muted">Next</span>
+                  )}
+                </div>
+              ) : null}
             </div>
           </form>
         </div>
       </section>
     </div>
   );
+}
+
+function buildReviewHref(page: number) {
+  const params = new URLSearchParams();
+
+  if (page > 1) {
+    params.set("page", page.toString());
+  }
+
+  const query = params.toString();
+  return query ? `/inventory/review?${query}` : "/inventory/review";
 }

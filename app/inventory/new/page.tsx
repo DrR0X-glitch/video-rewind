@@ -54,6 +54,7 @@ export default async function InventoryNewPage({
       </section>
 
       <InventoryNewFlow
+        key={`${params.selected ?? ""}|${params.tmdb ?? ""}|${title}|${suggestedSortTitle}`}
         initialSelectedMovies={selectedMovies}
         duplicateMovie={duplicateMovie}
         suggestedSortTitle={suggestedSortTitle}

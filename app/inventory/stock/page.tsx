@@ -19,9 +19,11 @@ type StockPageProps = {
     preset?: string;
     primary?: string;
     q?: string;
+    row?: string | string[];
     sealed?: string | string[];
     showAll?: string;
     sort?: string;
+    section?: string | string[];
     zone?: string | string[];
   }>;
 };
@@ -90,6 +92,8 @@ export default async function InventoryStockPage({ searchParams }: StockPageProp
       ? Number.parseInt(params.page, 10)
       : 1;
   const query = params.q?.trim() ?? "";
+  const section = normalizeLocationFilter(params.section);
+  const row = normalizeLocationFilter(params.row);
   const presetHrefState = {
     availability: selectedAvailability,
     edited: selectedEdited,
@@ -100,11 +104,15 @@ export default async function InventoryStockPage({ searchParams }: StockPageProp
     sort: selectedSort,
     dir: selectedDir,
     q: query,
+    section,
+    row,
   };
 
   const stockPage = await listStockDiscs({
     preset: selectedPreset,
     q: query || undefined,
+    section: section || undefined,
+    row: row || undefined,
     availability: selectedAvailability,
     edited: selectedEdited,
     formats: selectedFormats,
@@ -137,6 +145,8 @@ export default async function InventoryStockPage({ searchParams }: StockPageProp
     page: currentPage,
     showAll,
     q: query,
+    section,
+    row,
     sort: selectedSort,
     zones: selectedZones,
   });
@@ -153,6 +163,8 @@ export default async function InventoryStockPage({ searchParams }: StockPageProp
           page: currentPage - 1,
           showAll: false,
           q: query,
+          section,
+          row,
           sort: selectedSort,
           zones: selectedZones,
         })
@@ -170,6 +182,8 @@ export default async function InventoryStockPage({ searchParams }: StockPageProp
           page: currentPage + 1,
           showAll: false,
           q: query,
+          section,
+          row,
           sort: selectedSort,
           zones: selectedZones,
         })
@@ -213,6 +227,28 @@ export default async function InventoryStockPage({ searchParams }: StockPageProp
                 name="q"
                 defaultValue={query}
                 placeholder="Discs, titles, location, notes"
+              />
+            </label>
+            <label className="search-label stock-location-filter">
+              <span>Section</span>
+              <input
+                type="text"
+                name="section"
+                defaultValue={section}
+                placeholder="A1"
+                maxLength={2}
+                autoComplete="off"
+              />
+            </label>
+            <label className="search-label stock-location-filter">
+              <span>Row</span>
+              <input
+                type="text"
+                name="row"
+                defaultValue={row}
+                placeholder="03"
+                maxLength={2}
+                autoComplete="off"
               />
             </label>
             <SingleSelectDropdown
@@ -278,6 +314,8 @@ export default async function InventoryStockPage({ searchParams }: StockPageProp
         <div className="stock-table-shell">
           <form id={bulkFormId} action={applyBulkStockAction} className="stack-form">
             <input type="hidden" name="q" value={query} />
+            <input type="hidden" name="section" value={section} />
+            <input type="hidden" name="row" value={row} />
             <input type="hidden" name="availabilityFilter" value={selectedAvailability} />
             <input type="hidden" name="edited" value={selectedEdited} />
             <input type="hidden" name="primary" value={selectedPrimary} />
@@ -337,6 +375,8 @@ export default async function InventoryStockPage({ searchParams }: StockPageProp
                       formats: selectedFormats,
                       page: 1,
                       q: query,
+                      section,
+                      row,
                       sort: selectedSort,
                       zones: selectedZones,
                     })}>Paginate</Link>
@@ -364,6 +404,8 @@ export default async function InventoryStockPage({ searchParams }: StockPageProp
                         page: 1,
                         showAll: true,
                         q: query,
+                        section,
+                        row,
                         sort: selectedSort,
                         zones: selectedZones,
                       })}>Show All</Link>
@@ -398,6 +440,8 @@ function renderSortLink(
     dir: nextDir,
     formats: getSelectedValues(params.format, FORMAT_OPTIONS),
     q: params.q ?? "",
+    section: normalizeLocationFilter(params.section),
+    row: normalizeLocationFilter(params.row),
     sort: column,
     zones: getSelectedValues(params.zone, ZONE_OPTIONS),
   });
@@ -420,6 +464,8 @@ function buildStockHref(input: {
   page?: number;
   showAll?: boolean;
   q?: string;
+  section?: string;
+  row?: string;
   reviewedState?: string;
   sort?: string;
   zones?: string[];
@@ -427,6 +473,8 @@ function buildStockHref(input: {
   const params = new URLSearchParams();
 
   if (input.q && input.q.trim()) params.set("q", input.q.trim());
+  if (input.section && input.section.trim()) params.set("section", input.section.trim().toUpperCase());
+  if (input.row && input.row.trim()) params.set("row", input.row.trim().toUpperCase());
   if (input.availability && input.availability !== "all") params.set("availability", input.availability);
   if (input.edited && input.edited !== "all") params.set("edited", input.edited);
   if (input.primary && input.primary !== "all") params.set("primary", input.primary);
@@ -551,7 +599,9 @@ function applyPresetToFilters(
     sealedStates: string[];
     sort: string;
     dir: string;
-    q: string;
+  q: string;
+  section: string;
+  row: string;
   },
 ) {
   if (preset === "all") {
@@ -565,6 +615,8 @@ function applyPresetToFilters(
       sort: current.sort,
       dir: current.dir,
       q: current.q,
+      section: current.section,
+      row: current.row,
     };
   }
 
@@ -579,8 +631,15 @@ function applyPresetToFilters(
       sealedStates: [],
       sort: "location",
       dir: "asc",
+      section: current.section,
+      row: current.row,
     };
   }
 
   return current;
+}
+
+function normalizeLocationFilter(value?: string | string[]) {
+  const selectedValue = Array.isArray(value) ? value[0] : value;
+  return typeof selectedValue === "string" ? selectedValue.trim().toUpperCase().slice(0, 2) : "";
 }

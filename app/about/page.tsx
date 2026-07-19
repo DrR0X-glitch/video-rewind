@@ -1,56 +1,49 @@
+import Link from "next/link";
+
 export default function AboutPage() {
   return (
     <div className="about-page">
-      <section className="panel section about-panel">
-        <div className="about-hero">
-          <div className="about-hero-copy">
-            <p className="eyebrow">About Video Rewind</p>
-            <h1>In a world of disappearing libraries decision fatigue, Video Rewind exists for people who want something real.</h1>
-            <p className="about-deck">
-              We&apos;re a modern video rental store built on a simple belief: movies, shows, and music deserve to be experienced at their best, always, not once from an ever-changing catalogue.
-            </p>
-          </div>
-          <div className="about-sticker">
-            <span>Movies,</span>
-            <span>Done Right</span>
-          </div>
-        </div>
+      <header className="about-hero">
+        <p className="eyebrow">About Video Rewind</p>
+        <h1>Physical media, shelved properly, with no algorithm in the middle.</h1>
+        <p className="about-deck">
+          Video Rewind is for people who still like browsing titles, comparing formats, and choosing something that
+          stays available tomorrow.
+        </p>
+      </header>
 
-        <div className="about-body">
-          <div className="about-column">
-            <p className="about-lead">
-              That&apos;s why we specialize in physical media. From Blu-ray and 4K UHD to DVD and even VHS, every format we carry offers something streaming can&apos;t fully replicate: consistent quality, complete editions, and the assurance that what you love won&apos;t suddenly vanish overnight.
-            </p>
-            <p>
-              But Video Rewind isn&apos;t just about resolution and bitrate. It&apos;s about connection.
-            </p>
-            <p>
-              Walking through our doors is a throwback to a time when discovering something to watch was an experience in itself. The shelves, the cover art, the staff picks, the quiet debates over what to take home. It&apos;s all part of the ritual. For some, it&apos;s nostalgia. For others, it&apos;s something entirely new.
-            </p>
-          </div>
+      <section className="about-section">
+        <p className="about-lead">
+          Streaming is convenient. Physical media is stable. We keep the collection in formats that hold up in the
+          real world: DVD, Blu-ray, 4K UHD, and the occasional archival oddity when it belongs on a shelf.
+        </p>
+        <ul className="about-list">
+          <li>Complete editions and bonus features</li>
+          <li>No disappearing catalogue problem</li>
+          <li>Real shelves, real cover art, real recommendations</li>
+          <li>Clear copy counts and format choices</li>
+        </ul>
+      </section>
 
-          <div className="about-column">
-            <div className="about-side-block">
-              <p className="eyebrow">Why Physical</p>
-              <ul className="about-list">
-                <li>Consistent picture and sound quality</li>
-                <li>Complete editions and bonus features</li>
-                <li>No disappearing catalogue problems</li>
-                <li>Real shelves, real cover art, real recommendations</li>
-              </ul>
-            </div>
-            <p>
-              We curate our collection with care, highlighting everything from cult classics and forgotten gems to the latest releases in their highest-quality formats. No algorithms. No autoplay. Just real recommendations from people who love film as much as you do.
-            </p>
-          </div>
-        </div>
+      <section className="about-section">
+        <p>
+          The app follows the same idea. Search the public catalogue, browse by row, and use the collection without
+          extra noise getting in the way.
+        </p>
+        <p>
+          Everything stays flat, readable, and direct. No decorative noise, no hidden controls, just the paths people
+          actually need.
+        </p>
+      </section>
 
-        <div className="about-quote">
-          <p className="about-closing">
-            At Video Rewind, you&apos;re not just renting a movie. You&apos;re reclaiming the experience of choosing it, holding it, and truly owning it.
-          </p>
-          <p className="about-tagline">Because some things are worth rewinding.</p>
-        </div>
+      <section className="about-quote">
+        <p className="about-closing">
+          At Video Rewind, the point is not just to rent a movie. It is to make the choice feel worth making.
+        </p>
+        <p className="about-tagline">Because some things are worth rewinding.</p>
+        <p className="about-link-row">
+          <Link href="/search">Search the Catalogue</Link>
+        </p>
       </section>
     </div>
   );

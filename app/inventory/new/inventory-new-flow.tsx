@@ -16,7 +16,6 @@ type DiscDraft = {
   format: "dvd" | "blu-ray" | "4k-uhd";
   sealed: boolean;
   zone: string;
-  section: string;
   row: string;
   dayPrice: string;
   weekendPrice: string;
@@ -41,7 +40,6 @@ const DEFAULT_DISC_DRAFT: DiscDraft = {
   format: "blu-ray",
   sealed: false,
   zone: "W",
-  section: "",
   row: "",
   dayPrice: "0",
   weekendPrice: "0",
@@ -77,87 +75,73 @@ export function InventoryNewFlow({
   const [searchError, setSearchError] = useState("");
   const [formError, setFormError] = useState("");
   const [sectionOverride, setSectionOverride] = useState<string | null>(null);
-  const [seasonDrafts, setSeasonDrafts] = useState<Record<string, SeasonDraft>>({});
+  const [seasonDrafts, setSeasonDrafts] = useState<Record<string, SeasonDraft>>(() =>
+    createSeasonDrafts(initialSelectedMovies),
+  );
 
   const selectedTitleIdsValue = selectedMovies.map((movie) => movie.id).join(",");
   const defaultSectionFromTitle =
     (selectedMovies[0]?.sortTitle ?? suggestedSortTitle).charAt(0).toUpperCase() || "A";
+  const sectionValue = sectionOverride ?? defaultSectionFromTitle;
 
   useEffect(() => {
-    setSelectedMovies(initialSelectedMovies);
-  }, [initialSelectedMovies]);
+    const timeoutId = window.setTimeout(() => {
+      try {
+        const savedDefaults =
+          window.localStorage.getItem(DISC_DEFAULTS_STORAGE_KEY) ??
+          window.sessionStorage.getItem(LEGACY_DISC_DEFAULTS_STORAGE_KEY);
 
-  useEffect(() => {
-    setSeasonDrafts((currentDrafts) => {
-      const nextDrafts: Record<string, SeasonDraft> = {};
+        if (!savedDefaults) {
+          setDiscDraft(DEFAULT_DISC_DRAFT);
+          setSectionOverride(null);
+          return;
+        }
 
-      for (const movie of selectedMovies) {
-        nextDrafts[movie.id] = currentDrafts[movie.id] ?? {
-          seasonStart: "",
-          seasonEnd: "",
-          episodeStart: "",
-          episodeEnd: "",
-        };
-      }
-
-      return nextDrafts;
-    });
-  }, [selectedMovies]);
-
-  useEffect(() => {
-    try {
-      const savedDefaults =
-        window.localStorage.getItem(DISC_DEFAULTS_STORAGE_KEY) ??
-        window.sessionStorage.getItem(LEGACY_DISC_DEFAULTS_STORAGE_KEY);
-
-      if (!savedDefaults) {
-        setDiscDraft(DEFAULT_DISC_DRAFT);
-        setHasLoadedDraft(true);
-        return;
-      }
-
-      const parsedDefaults = JSON.parse(savedDefaults) as Partial<DiscDefaults>;
-      const legacyCondition = (parsedDefaults as { condition?: string }).condition;
-      setDiscDraft({
-        availability: DEFAULT_DISC_DRAFT.availability,
-        format:
-          parsedDefaults.format === "dvd" || parsedDefaults.format === "4k-uhd" || parsedDefaults.format === "blu-ray"
-            ? parsedDefaults.format
-            : DEFAULT_DISC_DRAFT.format,
-        sealed:
-          typeof parsedDefaults.sealed === "boolean"
-            ? parsedDefaults.sealed
-            : legacyCondition === "sealed"
-              ? true
-              : legacyCondition === "not-sealed"
-                ? false
-                : DEFAULT_DISC_DRAFT.sealed,
-        zone:
-          typeof parsedDefaults.zone === "string" && parsedDefaults.zone
-            ? parsedDefaults.zone
-            : DEFAULT_DISC_DRAFT.zone,
-        section:
+        const parsedDefaults = JSON.parse(savedDefaults) as Partial<DiscDefaults>;
+        const legacyCondition = (parsedDefaults as { condition?: string }).condition;
+        setDiscDraft({
+          availability: DEFAULT_DISC_DRAFT.availability,
+          format:
+            parsedDefaults.format === "dvd" ||
+            parsedDefaults.format === "4k-uhd" ||
+            parsedDefaults.format === "blu-ray"
+              ? parsedDefaults.format
+              : DEFAULT_DISC_DRAFT.format,
+          sealed:
+            typeof parsedDefaults.sealed === "boolean"
+              ? parsedDefaults.sealed
+              : legacyCondition === "sealed"
+                ? true
+                : legacyCondition === "not-sealed"
+                  ? false
+                  : DEFAULT_DISC_DRAFT.sealed,
+          zone:
+            typeof parsedDefaults.zone === "string" && parsedDefaults.zone
+              ? parsedDefaults.zone
+              : DEFAULT_DISC_DRAFT.zone,
+          row: typeof parsedDefaults.row === "string" ? parsedDefaults.row : DEFAULT_DISC_DRAFT.row,
+          dayPrice: DEFAULT_DISC_DRAFT.dayPrice,
+          weekendPrice: DEFAULT_DISC_DRAFT.weekendPrice,
+          lateClass: DEFAULT_DISC_DRAFT.lateClass,
+          notes: DEFAULT_DISC_DRAFT.notes,
+          generateBarcode: DEFAULT_DISC_DRAFT.generateBarcode,
+        });
+        setSectionOverride(
           typeof parsedDefaults.sectionOverride === "string" && parsedDefaults.sectionOverride.trim()
             ? parsedDefaults.sectionOverride
-            : defaultSectionFromTitle,
-        row: typeof parsedDefaults.row === "string" ? parsedDefaults.row : DEFAULT_DISC_DRAFT.row,
-        dayPrice: DEFAULT_DISC_DRAFT.dayPrice,
-        weekendPrice: DEFAULT_DISC_DRAFT.weekendPrice,
-        lateClass: DEFAULT_DISC_DRAFT.lateClass,
-        notes: DEFAULT_DISC_DRAFT.notes,
-        generateBarcode: DEFAULT_DISC_DRAFT.generateBarcode,
-      });
-      setSectionOverride(
-        typeof parsedDefaults.sectionOverride === "string" && parsedDefaults.sectionOverride.trim()
-          ? parsedDefaults.sectionOverride
-          : null,
-      );
-    } catch {
-      setDiscDraft(DEFAULT_DISC_DRAFT);
-      setSectionOverride(null);
-    } finally {
-      setHasLoadedDraft(true);
-    }
+            : null,
+        );
+      } catch {
+        setDiscDraft(DEFAULT_DISC_DRAFT);
+        setSectionOverride(null);
+      } finally {
+        setHasLoadedDraft(true);
+      }
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
   }, [defaultSectionFromTitle]);
 
   useEffect(() => {
@@ -178,17 +162,6 @@ export function InventoryNewFlow({
   }, [discDraft.format, discDraft.row, discDraft.sealed, discDraft.zone, hasLoadedDraft, sectionOverride]);
 
   useEffect(() => {
-    if (!hasLoadedDraft || sectionOverride) {
-      return;
-    }
-
-    setDiscDraft((currentDraft) => ({
-      ...currentDraft,
-      section: defaultSectionFromTitle,
-    }));
-  }, [defaultSectionFromTitle, hasLoadedDraft, sectionOverride]);
-
-  useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       setDebouncedSearch(search);
     }, 250);
@@ -202,10 +175,15 @@ export function InventoryNewFlow({
     const trimmedSearch = debouncedSearch.trim();
 
     if (!trimmedSearch) {
-      setMatches([]);
-      setIsSearching(false);
-      setSearchError("");
-      return;
+      const timeoutId = window.setTimeout(() => {
+        setMatches([]);
+        setIsSearching(false);
+        setSearchError("");
+      }, 0);
+
+      return () => {
+        window.clearTimeout(timeoutId);
+      };
     }
 
     const abortController = new AbortController();
@@ -253,30 +231,43 @@ export function InventoryNewFlow({
         ? currentMovies
         : [...currentMovies, movie],
     );
+    setSeasonDrafts((currentDrafts) =>
+      movie.mediaType === "series" && !currentDrafts[movie.id]
+        ? {
+            ...currentDrafts,
+            [movie.id]: createEmptySeasonDraft(),
+          }
+        : currentDrafts,
+    );
   }
 
   function removeSelectedMovie(movieId: string) {
     setSelectedMovies((currentMovies) =>
       currentMovies.filter((movie) => movie.id !== movieId),
     );
+    setSeasonDrafts((currentDrafts) => {
+      if (!currentDrafts[movieId]) {
+        return currentDrafts;
+      }
+
+      const nextDrafts = { ...currentDrafts };
+      delete nextDrafts[movieId];
+      return nextDrafts;
+    });
   }
 
   function autofillSection() {
     setSectionOverride(null);
-    setDiscDraft((currentDraft) => ({
-      ...currentDraft,
-      section: defaultSectionFromTitle,
-    }));
     setFormError("");
   }
 
   function validateDiscForm() {
-    if (!discDraft.section.trim()) {
+    if (!sectionValue.trim()) {
       setFormError("Section is required.");
       return false;
     }
 
-    if (discDraft.section.trim().length < 1 || discDraft.section.trim().length > 2) {
+    if (sectionValue.trim().length < 1 || sectionValue.trim().length > 2) {
       setFormError("Section must be 1 or 2 characters.");
       return false;
     }
@@ -463,6 +454,7 @@ export function InventoryNewFlow({
                 onAutofillSection={autofillSection}
                 seasonDrafts={seasonDrafts}
                 selectedMovies={selectedMovies}
+                sectionValue={sectionValue}
                 setSeasonDrafts={setSeasonDrafts}
                 setSectionOverride={setSectionOverride}
                 setDiscDraft={setDiscDraft}
@@ -559,6 +551,7 @@ function DiscFields({
   onAutofillSection,
   seasonDrafts,
   selectedMovies,
+  sectionValue,
   setSeasonDrafts,
   setSectionOverride,
   setDiscDraft,
@@ -568,6 +561,7 @@ function DiscFields({
   onAutofillSection: () => void;
   seasonDrafts: Record<string, SeasonDraft>;
   selectedMovies: MovieWithInventory[];
+  sectionValue: string;
   setSeasonDrafts: React.Dispatch<React.SetStateAction<Record<string, SeasonDraft>>>;
   setSectionOverride: React.Dispatch<React.SetStateAction<string | null>>;
   setDiscDraft: React.Dispatch<React.SetStateAction<DiscDraft>>;
@@ -629,7 +623,7 @@ function DiscFields({
       <label>
         <span className="form-label-row">
           <span>Section</span>
-          {!discDraft.section.trim() ? (
+          {!sectionValue.trim() ? (
             <button type="button" className="link-button" onClick={onAutofillSection}>
               Autofill ({defaultSectionFromTitle})
             </button>
@@ -640,12 +634,11 @@ function DiscFields({
           name="section"
           required
           maxLength={2}
-          value={discDraft.section}
+          value={sectionValue}
           onChange={(event) =>
             {
               const nextValue = event.target.value.toUpperCase().slice(0, 2);
               setSectionOverride(nextValue.trim() ? nextValue : null);
-              setDiscDraft((currentDraft) => ({ ...currentDraft, section: nextValue }));
             }}
         />
       </label>
@@ -858,4 +851,23 @@ function DiscFields({
       </label>
     </>
   );
+}
+
+function createEmptySeasonDraft(): SeasonDraft {
+  return {
+    seasonStart: "",
+    seasonEnd: "",
+    episodeStart: "",
+    episodeEnd: "",
+  };
+}
+
+function createSeasonDrafts(movies: MovieWithInventory[]) {
+  const drafts: Record<string, SeasonDraft> = {};
+
+  for (const movie of movies) {
+    drafts[movie.id] = createEmptySeasonDraft();
+  }
+
+  return drafts;
 }

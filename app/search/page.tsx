@@ -9,6 +9,7 @@ type SearchPageProps = {
     decade?: string;
     genre?: string;
     q?: string;
+    page?: string;
     sort?: string;
   }>;
 };
@@ -60,6 +61,10 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const params = await searchParams;
   const filters = await getBrowseFilters();
   const genres = Array.isArray(filters?.genres) ? filters.genres : [];
+  const initialPage =
+    typeof params.page === "string" && /^\d+$/.test(params.page) && Number.parseInt(params.page, 10) > 0
+      ? Number.parseInt(params.page, 10)
+      : 1;
 
   return (
     <PublicCatalogueClient
@@ -70,6 +75,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
       initialGenre={params.genre ?? "all"}
       initialQuery={params.q?.trim() ?? ""}
       initialSort={allowedSorts.has(params.sort ?? "") ? params.sort ?? "title" : "title"}
+      initialPage={initialPage}
     />
   );
 }

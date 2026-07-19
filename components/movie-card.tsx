@@ -31,7 +31,6 @@ export function MovieCard({
         ) : (
           <PosterSwatch
             title={movie.title}
-            year={formatReleaseYear(movie.releaseDate)}
             color={movie.posterColor}
           />
         )}

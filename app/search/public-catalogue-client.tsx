@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 import { MovieCard } from "@/components/movie-card";
@@ -14,7 +14,15 @@ type PublicCatalogueClientProps = {
   initialGenre: string;
   initialQuery: string;
   initialSort: string;
+  initialPage: number;
 };
+
+type PublicCataloguePage = {
+  items: MovieWithInventory[];
+  totalCount: number;
+};
+
+const PUBLIC_PAGE_SIZE = 24;
 
 const sortOptions = [
   { value: "title", label: "Alphabetical" },
@@ -32,6 +40,7 @@ export function PublicCatalogueClient({
   initialGenre,
   initialQuery,
   initialSort,
+  initialPage,
 }: PublicCatalogueClientProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -40,10 +49,13 @@ export function PublicCatalogueClient({
   const [decade, setDecade] = useState(initialDecade);
   const [sort, setSort] = useState(initialSort);
   const [availableOnly, setAvailableOnly] = useState(initialAvailable);
+  const [page, setPage] = useState(initialPage);
   const [debouncedQuery, setDebouncedQuery] = useState(initialQuery);
   const [results, setResults] = useState<MovieWithInventory[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
+  const previousFilterKeyRef = useRef("");
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -54,6 +66,16 @@ export function PublicCatalogueClient({
       window.clearTimeout(timeoutId);
     };
   }, [query]);
+
+  useEffect(() => {
+    const filterKey = [debouncedQuery.trim(), genre, decade, sort, availableOnly ? "1" : "0"].join("|");
+
+    if (previousFilterKeyRef.current && previousFilterKeyRef.current !== filterKey) {
+      setPage(1);
+    }
+
+    previousFilterKeyRef.current = filterKey;
+  }, [availableOnly, decade, debouncedQuery, genre, sort]);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -78,8 +100,12 @@ export function PublicCatalogueClient({
       params.set("available", "true");
     }
 
+    if (page > 1) {
+      params.set("page", page.toString());
+    }
+
     router.replace(params.toString() ? `${pathname}?${params.toString()}` : pathname, { scroll: false });
-  }, [availableOnly, decade, debouncedQuery, genre, pathname, router, sort]);
+  }, [availableOnly, decade, debouncedQuery, genre, page, pathname, router, sort]);
 
   useEffect(() => {
     const abortController = new AbortController();
@@ -105,6 +131,9 @@ export function PublicCatalogueClient({
       params.set("available", "true");
     }
 
+    params.set("page", page.toString());
+    params.set("pageSize", PUBLIC_PAGE_SIZE.toString());
+
     async function runSearch() {
       setIsSearching(true);
       setSearchError("");
@@ -127,14 +156,16 @@ export function PublicCatalogueClient({
           throw new Error(message);
         }
 
-        const data = (await response.json()) as MovieWithInventory[];
-        setResults(data);
+        const data = (await response.json()) as PublicCataloguePage;
+        setResults(Array.isArray(data.items) ? data.items : []);
+        setTotalCount(typeof data.totalCount === "number" ? data.totalCount : 0);
       } catch (error) {
         if (abortController.signal.aborted) {
           return;
         }
 
         setResults([]);
+        setTotalCount(0);
         setSearchError(error instanceof Error ? error.message : "Search failed");
       } finally {
         if (!abortController.signal.aborted) {
@@ -148,7 +179,12 @@ export function PublicCatalogueClient({
     return () => {
       abortController.abort();
     };
-  }, [availableOnly, decade, debouncedQuery, genre, sort]);
+  }, [availableOnly, decade, debouncedQuery, genre, page, sort]);
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / PUBLIC_PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageStart = totalCount === 0 ? 0 : (currentPage - 1) * PUBLIC_PAGE_SIZE + 1;
+  const pageEnd = totalCount === 0 ? 0 : pageStart + results.length - 1;
 
   return (
     <div className="search-catalogue">
@@ -163,7 +199,10 @@ export function PublicCatalogueClient({
             id="public-catalogue-search"
             type="text"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setPage(1);
+            }}
             placeholder="Search title, cast, genre, director, or description"
             autoComplete="off"
           />
@@ -174,7 +213,13 @@ export function PublicCatalogueClient({
         <div className="search-filter-row">
           <label>
             <span>Genre</span>
-            <select value={genre} onChange={(event) => setGenre(event.target.value)}>
+            <select
+              value={genre}
+              onChange={(event) => {
+                setGenre(event.target.value);
+                setPage(1);
+              }}
+            >
               <option value="all">All genres</option>
               {genres.map((option) => (
                 <option key={option} value={option}>
@@ -185,7 +230,13 @@ export function PublicCatalogueClient({
           </label>
           <label>
             <span>Decade</span>
-            <select value={decade} onChange={(event) => setDecade(event.target.value)}>
+            <select
+              value={decade}
+              onChange={(event) => {
+                setDecade(event.target.value);
+                setPage(1);
+              }}
+            >
               <option value="all">All decades</option>
               {decades.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -196,7 +247,13 @@ export function PublicCatalogueClient({
           </label>
           <label>
             <span>Sort</span>
-            <select value={sort} onChange={(event) => setSort(event.target.value)}>
+            <select
+              value={sort}
+              onChange={(event) => {
+                setSort(event.target.value);
+                setPage(1);
+              }}
+            >
               {sortOptions.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
@@ -208,7 +265,10 @@ export function PublicCatalogueClient({
             <input
               type="checkbox"
               checked={availableOnly}
-              onChange={(event) => setAvailableOnly(event.target.checked)}
+              onChange={(event) => {
+                setAvailableOnly(event.target.checked);
+                setPage(1);
+              }}
             />
             <span>Available only</span>
           </label>
@@ -219,7 +279,7 @@ export function PublicCatalogueClient({
         <div className="section-heading">
           <h2>Results</h2>
           <p className="muted utility-row">
-            {isSearching ? "Searching…" : `${results.length} matching titles`}
+            {isSearching ? "Searching…" : totalCount === 0 ? "0 matching titles" : `Showing ${pageStart}-${pageEnd} of ${totalCount}`}
           </p>
         </div>
         {searchError ? (
@@ -227,7 +287,7 @@ export function PublicCatalogueClient({
             <p>{searchError}</p>
           </section>
         ) : null}
-        {!searchError && !isSearching && results.length === 0 ? (
+        {!searchError && !isSearching && totalCount === 0 ? (
           <section className="panel section">
             <p>No titles match the current search and filters.</p>
           </section>
@@ -237,6 +297,25 @@ export function PublicCatalogueClient({
             <MovieCard key={movie.id} movie={movie} />
           ))}
         </div>
+        {totalCount > PUBLIC_PAGE_SIZE || page > 1 ? (
+          <div className="section stock-table-footer">
+            <p className="muted utility-row">
+              Page {currentPage} of {totalPages}
+            </p>
+            <div className="header-actions stock-pagination">
+              <button type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={currentPage <= 1}>
+                Previous
+              </button>
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                disabled={currentPage >= totalPages}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        ) : null}
       </section>
     </div>
   );

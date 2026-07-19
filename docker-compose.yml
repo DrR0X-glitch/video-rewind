@@ -26,6 +26,7 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgres://dvd:dvd@postgres:5432/dvd_store
+      SEED_DEV_DB: "true"
       # TMDB_API_READ_ACCESS_TOKEN: ${TMDB_API_READ_ACCESS_TOKEN}
       # OMDB_API_KEY:
       PORT: 3000

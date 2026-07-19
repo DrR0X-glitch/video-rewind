@@ -45,7 +45,6 @@ export default async function MovieDetailPage(props: PageProps<"/movies/[id]">) 
         ) : (
           <PosterSwatch
             title={movie.title}
-            year={formatReleaseYear(movie.releaseDate)}
             color={movie.posterColor}
             size="detail"
           />

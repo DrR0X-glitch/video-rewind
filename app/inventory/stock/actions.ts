@@ -18,6 +18,8 @@ function getStringList(formData: FormData, key: string) {
 
 export async function applyBulkStockAction(formData: FormData) {
   const q = getString(formData, "q");
+  const section = getString(formData, "section");
+  const row = getString(formData, "row");
   const availabilityFilter = getString(formData, "availabilityFilter") || "all";
   const edited = getString(formData, "edited") || "all";
   const formats = getStringList(formData, "format");
@@ -51,6 +53,8 @@ export async function applyBulkStockAction(formData: FormData) {
 
   const params = new URLSearchParams();
   if (q) params.set("q", q);
+  if (section) params.set("section", section);
+  if (row) params.set("row", row);
   if (availabilityFilter !== "all") params.set("availability", availabilityFilter);
   if (edited !== "all") params.set("edited", edited);
   if (primary !== "all") params.set("primary", primary);

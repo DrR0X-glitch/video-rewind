@@ -35,6 +35,8 @@ type MovieFilters = {
   mediaType?: "movie" | "series";
   excludeHomepageHidden?: boolean;
   limit?: number;
+  page?: number;
+  pageSize?: number;
   sort?: "title" | "rating-desc" | "popular" | "year-desc" | "year-asc";
 };
 
@@ -112,6 +114,7 @@ type TitleRow = {
   hide_from_homepage: boolean;
   available_count: number;
   total_copies: number;
+  total_count?: number;
   search_rank?: number;
 };
 
@@ -360,6 +363,14 @@ function buildListTitlesQuery(filters: MovieFilters) {
   const conditions = [];
   const values: Array<string | number> = [];
   let searchRankSql = "0";
+  const normalizedPageSize =
+    typeof filters.pageSize === "number" && Number.isInteger(filters.pageSize) && filters.pageSize > 0
+      ? filters.pageSize
+      : undefined;
+  const normalizedPage =
+    typeof filters.page === "number" && Number.isInteger(filters.page) && filters.page > 0
+      ? filters.page
+      : 1;
 
   if (filters.search) {
     const normalizedSearch = filters.search.trim().toLowerCase();
@@ -478,6 +489,14 @@ function buildListTitlesQuery(filters: MovieFilters) {
     typeof filters.limit === "number" && filters.limit > 0
       ? `LIMIT ${Math.max(1, Math.floor(filters.limit))}`
       : "";
+  const pageLimitClause =
+    typeof normalizedPageSize === "number"
+      ? `LIMIT ${normalizedPageSize}`
+      : "";
+  const offsetClause =
+    typeof normalizedPageSize === "number"
+      ? `OFFSET ${(normalizedPage - 1) * normalizedPageSize}`
+      : "";
   const orderClause =
     filters.search && (!filters.sort || filters.sort === "title")
       ? "ORDER BY search_rank DESC, t.sort_title ASC, t.title ASC"
@@ -509,6 +528,7 @@ function buildListTitlesQuery(filters: MovieFilters) {
         t.cast_members,
         t.featured,
         t.hide_from_homepage,
+        COUNT(*) OVER()::INT AS total_count,
         ${searchRankSql}::numeric AS search_rank,
         COUNT(DISTINCT i.id) FILTER (WHERE ${filters.reviewedOnly ? "i.reviewed = TRUE" : "TRUE"})::INT AS total_copies,
         COUNT(DISTINCT i.id) FILTER (WHERE ${filters.reviewedOnly ? "i.reviewed = TRUE AND " : ""}i.availability = TRUE)::INT AS available_count
@@ -526,7 +546,8 @@ function buildListTitlesQuery(filters: MovieFilters) {
             : ""
       }
       ${orderClause}
-      ${limitClause};
+      ${pageLimitClause || limitClause}
+      ${offsetClause};
     `,
     values,
   };
@@ -890,9 +911,19 @@ export async function getMovieFiltersFromDatabase(): Promise<{ genres: string[];
   return { genres, years };
 }
 
-export async function listMoviesFromDatabase(filters: MovieFilters) {
+export async function listMoviesPageFromDatabase(filters: MovieFilters) {
   const result = await pool.query<TitleRow>(buildListTitlesQuery(filters));
-  return result.rows;
+  const totalCount = result.rows[0]?.total_count ?? 0;
+
+  return {
+    items: result.rows,
+    totalCount,
+  };
+}
+
+export async function listMoviesFromDatabase(filters: MovieFilters) {
+  const result = await listMoviesPageFromDatabase(filters);
+  return result.items;
 }
 
 export async function getMovieFromDatabase(id: string) {
@@ -951,6 +982,24 @@ export async function listInventoryTitlesFromDatabase(query?: string, limit?: nu
   return rows.map((row) => toUiTitle(row));
 }
 
+export async function listInventoryTitlesPageFromDatabase(
+  query?: string,
+  page = 1,
+  pageSize = 20,
+) {
+  const pageResult = await listMoviesPageFromDatabase({
+    search: query?.trim() || undefined,
+    available: false,
+    page,
+    pageSize,
+  });
+
+  return {
+    items: pageResult.items.map((row) => toUiTitle(row)),
+    totalCount: pageResult.totalCount,
+  };
+}
+
 export async function listBrowseMoviesFromDatabase(filters: {
   search?: string;
   genre?: string;
@@ -988,6 +1037,52 @@ export async function listBrowseMoviesFromDatabase(filters: {
   });
 
   return rows.map((row) => toUiTitle(row));
+}
+
+export async function listBrowseMoviesPageFromDatabase(filters: {
+  search?: string;
+  genre?: string;
+  decade?: string;
+  available?: string;
+  mediaType?: string;
+  excludeHomepageHidden?: boolean;
+  limit?: number;
+  page?: number;
+  pageSize?: number;
+  sort?: string;
+}) {
+  const pageResult = await listMoviesPageFromDatabase({
+    search: filters.search?.trim() || undefined,
+    genre: filters.genre && filters.genre !== "all" ? filters.genre : undefined,
+    mediaType:
+      filters.mediaType === "movie" || filters.mediaType === "series"
+        ? filters.mediaType
+        : undefined,
+    excludeHomepageHidden: filters.excludeHomepageHidden === true,
+    decade:
+      filters.decade && filters.decade !== "all"
+        ? filters.decade === "pre-1950"
+          ? "pre-1950"
+          : Number.parseInt(filters.decade, 10)
+        : null,
+    available: filters.available === "true",
+    reviewedOnly: true,
+    limit: filters.limit,
+    page: filters.page,
+    pageSize: filters.pageSize,
+    sort:
+      filters.sort === "rating-desc" ||
+      filters.sort === "popular" ||
+      filters.sort === "year-desc" ||
+      filters.sort === "year-asc"
+        ? filters.sort
+        : "title",
+  });
+
+  return {
+    items: pageResult.items.map((row) => toUiTitle(row)),
+    totalCount: pageResult.totalCount,
+  };
 }
 
 export async function getTopGenresFromDatabase(
@@ -1632,6 +1727,8 @@ export async function getAlphabeticalStockSectionsFromDatabase(input: {
 export async function listStockDiscsFromDatabase(input: {
   preset?: string;
   q?: string;
+  section?: string;
+  row?: string;
   availability?: string;
   edited?: string;
   formats?: string[];
@@ -1750,6 +1847,16 @@ export async function listStockDiscsFromDatabase(input: {
   if (input.availability?.trim() && input.availability !== "all") {
     values.push(input.availability === "available" ? "true" : "false");
     conditions.push(`i.availability = $${values.length}::boolean`);
+  }
+
+  if (input.section?.trim()) {
+    values.push(input.section.trim().toUpperCase());
+    conditions.push(`UPPER(i.section) = $${values.length}`);
+  }
+
+  if (input.row?.trim()) {
+    values.push(input.row.trim().toUpperCase());
+    conditions.push(`UPPER(i.row) = $${values.length}`);
   }
 
   if (input.edited === "day") {

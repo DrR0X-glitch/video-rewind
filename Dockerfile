@@ -5,7 +5,7 @@ ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
 
 FROM base AS deps
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
 FROM base AS builder
@@ -27,4 +27,4 @@ COPY --from=builder /app/db ./db
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "node scripts/init-db.mjs && node server.js"]
+CMD ["sh", "-c", "node scripts/init-db.mjs && if [ \"$SEED_DEV_DB\" = \"true\" ]; then node scripts/seed-dev-db.mjs; fi && node server.js"]

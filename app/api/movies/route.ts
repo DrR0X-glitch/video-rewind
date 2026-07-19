@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-import { filterMovies } from "@/lib/data";
+import { filterMoviesPage } from "@/lib/data";
 import { ensureObject, jsonError, parseBoolean, parseInteger, requireString } from "@/lib/server/http";
 import { createMovieInDatabase } from "@/lib/server/store";
 
@@ -46,11 +46,12 @@ export async function GET(request: NextRequest) {
       genre: request.nextUrl.searchParams.get("genre")?.trim() || undefined,
       decade: parseDecade(request.nextUrl.searchParams.get("decade")),
       available: parseBoolean(request.nextUrl.searchParams.get("available"), "available"),
-      limit: parseInteger(request.nextUrl.searchParams.get("limit"), "limit") ?? undefined,
+      page: parseInteger(request.nextUrl.searchParams.get("page"), "page") ?? undefined,
+      pageSize: parseInteger(request.nextUrl.searchParams.get("pageSize"), "pageSize") ?? undefined,
       sort: request.nextUrl.searchParams.get("sort")?.trim() || undefined,
     };
 
-    const movies = await filterMovies({
+    const movies = await filterMoviesPage({
       search: filters.search,
       genre: filters.genre,
       decade:
@@ -58,7 +59,8 @@ export async function GET(request: NextRequest) {
           ? filters.decade.toString()
           : undefined,
       available: filters.available ? "true" : undefined,
-      limit: filters.limit,
+      page: filters.page,
+      pageSize: filters.pageSize,
       sort: filters.sort,
     });
     return NextResponse.json(movies);
