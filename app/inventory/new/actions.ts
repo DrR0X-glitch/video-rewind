@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { CustomTitleInputError } from "@/lib/catalog/custom-title-input";
+import { createCustomTitle } from "@/lib/server/catalog/custom-titles";
 import { fetchTmdbTitleDraft } from "@/lib/server/tmdb";
 import {
   createInventoryItemInDatabase,
@@ -155,4 +157,36 @@ export async function createTitleOnly(formData: FormData) {
   revalidatePath("/inventory");
   revalidatePath("/inventory/new");
   redirect("/inventory/new");
+}
+
+export async function createCustomTitleForNewDisc(formData: FormData) {
+  let result;
+  try {
+    result = await createCustomTitle({
+      title: getString(formData, "customTitle"),
+      sortTitle: getString(formData, "customSortTitle"),
+      mediaType: getString(formData, "customMediaType"),
+      releaseDate: getString(formData, "customReleaseDate"),
+      overview: getString(formData, "customOverview"),
+      genres: getString(formData, "customGenres"),
+      director: getString(formData, "customDirector"),
+    });
+  } catch (error) {
+    if (error instanceof CustomTitleInputError) {
+      redirect(`/inventory/new?customError=${encodeURIComponent(error.field)}`);
+    }
+    throw error;
+  }
+
+  const existingTitleIds = getString(formData, "titleIds")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+  const selectedIds = Array.from(new Set([result.titleId, ...existingTitleIds]));
+
+  revalidatePath("/inventory");
+  revalidatePath("/inventory/new");
+  redirect(
+    `/inventory/new?selected=${encodeURIComponent(selectedIds.join(","))}${result.duplicate ? "&customDuplicate=1" : ""}`,
+  );
 }

@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import {
   addDiscToExistingTitle,
   createTitleAndAddToDisc,
+  createCustomTitleForNewDisc,
   createTitleOnly,
 } from "@/app/inventory/new/actions";
 import { PosterSwatch } from "@/components/poster-swatch";
@@ -70,6 +71,8 @@ type InventoryNewFlowProps = {
   title: string;
   tmdbDraft: TmdbTitleDraft | null;
   tmdbInput: string;
+  customTitleError: string;
+  customTitleDuplicate: boolean;
 };
 
 export function InventoryNewFlow({
@@ -81,6 +84,8 @@ export function InventoryNewFlow({
   title,
   tmdbDraft,
   tmdbInput,
+  customTitleError,
+  customTitleDuplicate,
 }: InventoryNewFlowProps) {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -427,6 +432,13 @@ export function InventoryNewFlow({
 
   return (
     <>
+      {customTitleDuplicate ? (
+        <p className="muted" role="status">
+          A matching title already exists, so it has been selected. Review it before saving the
+          disc.
+        </p>
+      ) : null}
+
       <section className="panel section">
         <h2>1. Search Existing Titles</h2>
         <div className="inline-form">
@@ -475,7 +487,7 @@ export function InventoryNewFlow({
                   </ul>
                 </>
               ) : (
-                <p>No title found. Continue with the TMDB link below.</p>
+                <p>No title found. Continue with TMDB or enter a custom title below.</p>
               )
             ) : null}
           </div>
@@ -593,7 +605,7 @@ export function InventoryNewFlow({
               <input type="hidden" name="tmdb" value={tmdbInput} />
               <input type="hidden" name="titleIds" value={selectedTitleIdsValue} />
               <section className="panel section">
-                <h2>3. Title Setup</h2>
+                <h2>TMDB Title Setup</h2>
                 <div className="stack-form">
                   <label>
                     Title
@@ -633,10 +645,77 @@ export function InventoryNewFlow({
               </section>
             </form>
           ) : null}
+
+          <section className="panel section">
+            <h2>3. Enter a custom title</h2>
+            <p className="muted">
+              Use this option when there is no TMDB record. The title will be marked as manually
+              entered and added to the catalogue before you enter the disc details.
+            </p>
+            {customTitleError ? (
+              <p className="form-error" role="alert">
+                {getCustomTitleErrorMessage(customTitleError)}
+              </p>
+            ) : null}
+            <form action={createCustomTitleForNewDisc} className="stack-form">
+              <input type="hidden" name="titleIds" value={selectedTitleIdsValue} />
+              <label>
+                Title
+                <input type="text" name="customTitle" required maxLength={200} />
+              </label>
+              <label>
+                Sort title (optional)
+                <input type="text" name="customSortTitle" maxLength={200} />
+              </label>
+              <label>
+                Type
+                <select name="customMediaType" defaultValue="movie" required>
+                  <option value="movie">Movie</option>
+                  <option value="series">TV series</option>
+                </select>
+              </label>
+              <label>
+                Release date (optional)
+                <input type="date" name="customReleaseDate" />
+              </label>
+              <label>
+                Director / creator (optional)
+                <input type="text" name="customDirector" maxLength={200} />
+              </label>
+              <label>
+                Genres (optional, comma separated)
+                <input type="text" name="customGenres" placeholder="Drama, Comedy" />
+              </label>
+              <label>
+                Overview (optional)
+                <textarea name="customOverview" rows={4} maxLength={5000} />
+              </label>
+              <button type="submit">Create Custom Title</button>
+            </form>
+          </section>
         </>
       )}
     </>
   );
+}
+
+function getCustomTitleErrorMessage(error: string) {
+  switch (error) {
+    case "title":
+      return "Enter a title of 200 characters or fewer.";
+    case "mediaType":
+      return "Choose Movie or TV series.";
+    case "releaseDate":
+      return "Enter a valid release date.";
+    case "overview":
+      return "Overview must be 5,000 characters or fewer.";
+    case "genres":
+      return "Enter up to 20 genres, each 60 characters or fewer.";
+    case "director":
+      return "Director or creator must be 200 characters or fewer.";
+    default:
+      return "Check the custom title details and try again.";
+  }
 }
 
 function DiscFields({

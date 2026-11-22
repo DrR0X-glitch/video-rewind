@@ -46,6 +46,7 @@ describe("local PostgreSQL setup", () => {
     expect(result.rows.map((row) => row.migration_id)).toEqual([
       "0001_current_schema.sql",
       "0002_inventory_zones.sql",
+      "0003_custom_titles.sql",
     ]);
     expect(result.rows.every((row) => /^[a-f0-9]{64}$/.test(row.checksum))).toBe(true);
   });
@@ -59,7 +60,7 @@ describe("local PostgreSQL setup", () => {
       active_known_zone_count: string;
     }>(`
       SELECT
-        (SELECT COUNT(*) FROM titles) AS title_count,
+        (SELECT COUNT(*) FROM titles WHERE tmdb_id IS NOT NULL) AS title_count,
         (SELECT COUNT(*) FROM inventory_items) AS item_count,
         (SELECT COUNT(*) FROM inventory_item_titles) AS link_count,
         (SELECT COUNT(*) FROM inventory_zones WHERE code IN ('S', 'D', 'W')) AS known_zone_count,
