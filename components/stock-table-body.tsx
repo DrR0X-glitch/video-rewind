@@ -209,7 +209,7 @@ export function StockTableBody({
                 {rowAction.label}
               </button>
             ) : (
-              <Link href={`/inventory/discs/${item.id}/label?print=true`}>Print Label</Link>
+              <Link href={`/inventory/discs/${item.id}`}>Edit Disc</Link>
             )}
           </td>
         </tr>

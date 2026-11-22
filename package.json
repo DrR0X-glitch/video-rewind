@@ -29,6 +29,7 @@
     "db:down": "docker compose down"
   },
   "dependencies": {
+    "@zxing/browser": "^0.2.1",
     "next": "16.2.10",
     "pg": "^8.22.0",
     "react": "19.2.7",

@@ -9,6 +9,10 @@ import {
   renameInventoryZone,
   setInventoryZoneActive,
 } from "@/lib/server/inventory/zones";
+import {
+  createInventoryItemInDatabase,
+  updateInventoryItemInDatabase,
+} from "@/lib/server/inventory/items";
 
 let pool: Pool | undefined;
 
@@ -47,6 +51,7 @@ describe("local PostgreSQL setup", () => {
       "0001_current_schema.sql",
       "0002_inventory_zones.sql",
       "0003_custom_titles.sql",
+      "0004_inventory_upc_ean.sql",
     ]);
     expect(result.rows.every((row) => /^[a-f0-9]{64}$/.test(row.checksum))).toBe(true);
   });
@@ -72,6 +77,57 @@ describe("local PostgreSQL setup", () => {
     expect(Number(result.rows[0]?.link_count)).toBeGreaterThanOrEqual(10);
     expect(result.rows[0]?.known_zone_count).toBe("3");
     expect(result.rows[0]?.active_known_zone_count).toBe("3");
+  });
+
+  it("stores UPC/EAN values on inventory copies without requiring uniqueness", async () => {
+    const result = await pool!.query<{ is_nullable: string }>(`
+      SELECT is_nullable
+      FROM information_schema.columns
+      WHERE table_name = 'inventory_items' AND column_name = 'upc_ean'
+    `);
+    expect(result.rows[0]?.is_nullable).toBe("YES");
+
+    const titleResult = await pool!.query<{ id: string }>("SELECT id FROM titles LIMIT 1");
+    const titleId = titleResult.rows[0]?.id;
+    expect(titleId).toBeTruthy();
+    const barcode = "012345678905";
+    const createdIds: string[] = [];
+    const section = randomBytes(1).toString("hex").slice(0, 2).toUpperCase();
+
+    try {
+      const first = await createInventoryItemInDatabase({
+        title_ids: titleId,
+        format: "dvd",
+        zone: "S",
+        section,
+        upc_ean: barcode,
+      });
+      createdIds.push(first.id);
+      const second = await createInventoryItemInDatabase({
+        title_ids: titleId,
+        format: "dvd",
+        zone: "S",
+        section,
+        upc_ean: barcode,
+      });
+      createdIds.push(second.id);
+
+      const copies = await pool!.query<{ count: string }>(
+        "SELECT COUNT(*) FROM inventory_items WHERE id = ANY($1::uuid[]) AND upc_ean = $2",
+        [createdIds, barcode],
+      );
+      expect(copies.rows[0]?.count).toBe("2");
+
+      await updateInventoryItemInDatabase(first.id, { upc_ean: "4006381333931" });
+      await updateInventoryItemInDatabase(first.id, { upc_ean: "" });
+      const cleared = await pool!.query<{ upc_ean: string | null }>(
+        "SELECT upc_ean FROM inventory_items WHERE id = $1",
+        [first.id],
+      );
+      expect(cleared.rows[0]?.upc_ean).toBeNull();
+    } finally {
+      await pool!.query("DELETE FROM inventory_items WHERE id = ANY($1::uuid[])", [createdIds]);
+    }
   });
 
   it("creates, renames, deactivates, and reactivates a zone", async () => {

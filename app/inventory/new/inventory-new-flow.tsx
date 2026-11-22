@@ -10,6 +10,7 @@ import {
   createTitleOnly,
 } from "@/app/inventory/new/actions";
 import { PosterSwatch } from "@/components/poster-swatch";
+import { UpcEanInput } from "@/components/upc-ean-input";
 import { formatZoneLabel } from "@/lib/constants";
 import { formatLinkedTitleLabel, formatMediaType, formatMovieTitleWithYear } from "@/lib/format";
 import type { InventoryZone } from "@/lib/inventory-zones";
@@ -30,7 +31,6 @@ type DiscDraft = {
   weekendPrice: string;
   lateClass: string;
   notes: string;
-  generateBarcode: boolean;
 };
 
 type DiscDefaults = Pick<DiscDraft, "format" | "sealed" | "zone" | "row"> & {
@@ -59,7 +59,6 @@ const DEFAULT_DISC_DRAFT: DiscDraft = {
   weekendPrice: "0",
   lateClass: "0",
   notes: "",
-  generateBarcode: false,
 };
 
 type InventoryNewFlowProps = {
@@ -150,7 +149,6 @@ export function InventoryNewFlow({
           weekendPrice: DEFAULT_DISC_DRAFT.weekendPrice,
           lateClass: DEFAULT_DISC_DRAFT.lateClass,
           notes: DEFAULT_DISC_DRAFT.notes,
-          generateBarcode: DEFAULT_DISC_DRAFT.generateBarcode,
         });
         setSectionOverride(
           typeof parsedDefaults.sectionOverride === "string" &&
@@ -1017,21 +1015,7 @@ function DiscFields({
           }
         />
       </label>
-      <label className="checkbox-row">
-        <input
-          type="checkbox"
-          name="generateBarcode"
-          value="true"
-          checked={discDraft.generateBarcode}
-          onChange={(event) =>
-            setDiscDraft((currentDraft) => ({
-              ...currentDraft,
-              generateBarcode: event.target.checked,
-            }))
-          }
-        />
-        <span>Open label after save</span>
-      </label>
+      <UpcEanInput />
     </>
   );
 }

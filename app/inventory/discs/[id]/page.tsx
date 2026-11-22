@@ -1,5 +1,5 @@
-import { BarcodeSvg } from "@/components/barcode-svg";
 import Link from "next/link";
+import { UpcEanInput } from "@/components/upc-ean-input";
 
 import { updateDisc } from "@/app/inventory/discs/[id]/actions";
 import { formatZoneLabel } from "@/lib/constants";
@@ -63,12 +63,7 @@ export default async function InventoryDiscPage(props: PageProps<"/inventory/dis
           <p className="muted">
             Last edited: {disc.updatedAt ? formatDateTime(disc.updatedAt) : "Unknown"}
           </p>
-          <div className="barcode-panel">
-            <BarcodeSvg value={disc.inventoryCode} />
-            <div className="utility-row header-actions">
-              <Link href={`/inventory/discs/${disc.id}/label?print=true`}>Print Label</Link>
-            </div>
-          </div>
+          <p className="muted">Internal inventory ID: {disc.inventoryCode}</p>
         </section>
 
         <section className="panel section">
@@ -77,6 +72,7 @@ export default async function InventoryDiscPage(props: PageProps<"/inventory/dis
             <input type="hidden" name="discId" value={disc.id} />
             <input type="hidden" name="returnTitleId" value={primaryTitle?.id ?? ""} />
             <input type="hidden" name="returnTo" value={returnTo} />
+            <UpcEanInput defaultValue={disc.upcEan ?? ""} />
             <label>
               Format
               <select name="format" defaultValue={disc.format}>

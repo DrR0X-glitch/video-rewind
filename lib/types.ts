@@ -41,6 +41,7 @@ export type TitleCollection = {
 export type InventoryItem = {
   id: string;
   inventoryCode: string;
+  upcEan: string | null;
   format: DiscFormat;
   availability: boolean;
   reviewed: boolean;

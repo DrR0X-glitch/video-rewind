@@ -14,7 +14,6 @@ Live register of work currently in progress or waiting in the backlog. Remove co
 | ------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | DVD-007 | Expand domain test coverage | Add focused server, database, and browser tests as each product domain is implemented or substantially changed.                          |
 | DVD-008 | Prepare deployment cutover  | Keep deployment on hold until the roadmap is complete and staff authentication is ready; rehearse migration and recovery before cutover. |
-| DVD-010 | Plan barcode ownership      | Decide how release-level UPC/EAN codes relate to title records and individual stock copies; external lookup remains deferred.            |
 
 ## Register rules
 

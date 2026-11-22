@@ -5,13 +5,9 @@ import { redirect } from "next/navigation";
 
 import { CustomTitleInputError } from "@/lib/catalog/custom-title-input";
 import { createCustomTitle } from "@/lib/server/catalog/custom-titles";
+import { createInventoryItemInDatabase } from "@/lib/server/inventory/items";
 import { fetchTmdbTitleDraft } from "@/lib/server/tmdb";
-import {
-  createInventoryItemInDatabase,
-  createMovieInDatabase,
-  findDuplicateMovieForDraft,
-  generateInventoryCodeForDisc,
-} from "@/lib/server/store";
+import { createMovieInDatabase, findDuplicateMovieForDraft } from "@/lib/server/store";
 
 function getString(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -24,7 +20,6 @@ function getStringList(formData: FormData, key: string) {
 
 export async function addDiscToExistingTitle(formData: FormData) {
   const titleIds = getString(formData, "titleIds");
-  const generateBarcode = formData.get("generateBarcode") === "true";
   const linkedTitleIds = getStringList(formData, "linkedTitleId");
   const seasonStarts = getStringList(formData, "seasonStart");
   const seasonEnds = getStringList(formData, "seasonEnd");
@@ -50,6 +45,7 @@ export async function addDiscToExistingTitle(formData: FormData) {
     weekend_price: getString(formData, "weekendPrice"),
     late_class: getString(formData, "lateClass"),
     notes: getString(formData, "notes"),
+    upc_ean: getString(formData, "upcEan"),
   });
 
   revalidatePath("/inventory");
@@ -57,12 +53,6 @@ export async function addDiscToExistingTitle(formData: FormData) {
   revalidatePath(`/inventory/discs/${result.id}`);
   const primaryTitleId = titleIds.split(",")[0];
   revalidatePath(`/inventory/${primaryTitleId}`);
-
-  if (generateBarcode) {
-    await generateInventoryCodeForDisc(result.id);
-    revalidatePath(`/inventory/discs/${result.id}`);
-    redirect(`/inventory/discs/${result.id}/label?print=true`);
-  }
 
   redirect("/inventory/new");
 }

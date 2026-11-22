@@ -18,7 +18,7 @@ Do not introduce a separately deployed API, microservices, a second database, or
 
 This is a single-store staff tool and public catalogue with one relational data model. The planned workflows need reliable transactions across stock, rentals, sales, returns, and payments. PostgreSQL is a natural source of truth for those records, and a single application process can serve both server-rendered pages and interactive browser flows without internal HTTP calls between frontend and backend.
 
-The browser camera scanner belongs in a client-side UI component. It can submit the decoded barcode to the Next.js server layer for lookup and inventory actions. A keyboard scanner or another client can use a manual barcode field or a Route Handler later. Neither requires a separate backend today.
+The browser camera scanner belongs in a client-side UI component. UPC/EAN values are stored on individual inventory copies; repeated codes are allowed. Camera decoding is a progressive enhancement with a manual barcode field for unsupported browsers and keyboard scanners. External barcode lookup is deferred. Neither requires a separate backend today.
 
 This decision keeps an exit path: the domain modules can later be called from a separate API if the app gains another independently deployed client or a concrete operational reason to split.
 
@@ -55,12 +55,12 @@ Treat cleanup as part of each feature task, not as an unrelated follow-up:
 4. Add focused tests around extracted business rules and queries where practical; keep each extraction reviewable and run the project's verification commands.
 5. Remove the old implementation after all callers use the domain module. Avoid a long-lived re-export layer that preserves the monolith under a new filename.
 
-| Planned work                        | Existing `store.ts` responsibilities to extract as the work begins                                                                                                   |
-| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Custom titles and barcode lookup    | Title search/duplicate checks, title creation/update, TMDB collection handling; keep barcode-provider code in the integration adapter.                               |
-| Location management and stock moves | Location normalization, stock view queries, item updates/bulk actions, and inventory-code helpers; add explicit location/movement services.                          |
-| Staff identity                      | New `auth` module plus permission checks at every staff mutation/read boundary; avoid coupling domain services to the identity provider.                             |
-| Checkout and returns                | Inventory availability changes and the new transaction, line-item, pricing, and return logic; keep state transitions and pricing snapshots in database transactions. |
+| Planned work                        | Existing `store.ts` responsibilities to extract as the work begins                                                                                                      |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Custom titles and inventory barcode | Title search/duplicate checks and title creation/update; UPC/EAN capture belongs to inventory items. External barcode lookup stays behind a future integration adapter. |
+| Location management and stock moves | Location normalization, stock view queries, item updates/bulk actions, and inventory-code helpers; add explicit location/movement services.                             |
+| Staff identity                      | New `auth` module plus permission checks at every staff mutation/read boundary; avoid coupling domain services to the identity provider.                                |
+| Checkout and returns                | Inventory availability changes and the new transaction, line-item, pricing, and return logic; keep state transitions and pricing snapshots in database transactions.    |
 
 Do not split the entire file ahead of feature work. This review found no large, untouched section with a clean boundary: public catalogue reads join title and disc data, while stock and title operations share row types, mappers, and validation. Moving those blocks now would require extracting common internals first and could create churn before the feature requirements settle. The small health check is too small to justify a standalone refactor. Start the split with the first catalog/inventory task, then repeat this policy for staff identity and checkout.
 

@@ -17,7 +17,6 @@ Staff-first catalogue and inventory app for physical discs. The Next app owns bo
 - `/inventory/review` Review queue for unreviewed discs
 - `/inventory/[id]/edit` Edit title metadata
 - `/inventory/discs/[id]` Disc edit screen
-- `/inventory/discs/[id]/label` Printable disc label
 - `/inventory/stock` Searchable and sortable disc stock view
 
 ## Product Rules
@@ -95,7 +94,7 @@ At minimum:
 - Add a new disc
 - Apply bulk title actions from the title list
 - Open and edit a disc record directly
-- Print a label for any disc from the disc or stock workflow
+- Record an optional UPC/EAN barcode on each physical disc copy, using camera scanning where supported or manual entry
 - View stock in a searchable disc table
 
 Inventory title detail should show:
@@ -125,7 +124,7 @@ Current stock view:
 - optional `Show All` mode in pagination
 - shift-range checkbox selection within the current page
 - bulk edit for availability and location fields, plus bulk deletion
-- per-row print-label action
+- per-row disc editing action
 
 Wall preset:
 
@@ -165,7 +164,7 @@ Current review queue:
 8. A disc starts with boolean `availability`, defaulting to `true`.
 9. A disc starts with boolean `reviewed`, defaulting to `false`, and unreviewed discs do not appear on the public site.
 10. A disc receives a six-digit internal `inventory_code` when it is created.
-11. Staff can open the printable Code 128 label immediately after save or later from disc/stock screens.
+11. Staff can record a UPC/EAN barcode on the physical disc copy. Values are optional and may repeat across copies.
 12. When a disc links to a TV series title, staff records a contiguous season span for that disc-title link, such as `Season 7` or `Seasons 1-3`.
 13. When a disc only contains part of a single season, staff can also record a contiguous episode span such as `Episodes 1-3`.
 
@@ -245,6 +244,7 @@ Fields:
 
 - `id`
 - `inventory_code` required six-digit internal code
+- `upc_ean` optional UPC/EAN stored on this physical copy; duplicates allowed
 - `availability` boolean
 - `reviewed` boolean
 - `sealed` boolean
@@ -298,7 +298,6 @@ Example:
 - Inventory codes are allocated when a disc is created.
 - Inventory codes are six-digit numeric strings such as `000001`.
 - Label workflows print the existing inventory code; they do not mint a new code.
-- Labels are rendered as Code 128 SVG for browser printing.
 - The internal inventory code identifies the exact copy for rentals, returns, and damage tracking.
 
 ## Primary Disc Status

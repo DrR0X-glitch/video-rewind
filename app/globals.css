@@ -978,71 +978,17 @@ button:disabled {
   min-width: 0;
 }
 
-.barcode-panel {
+.barcode-scanner {
   display: grid;
-  gap: 0.6rem;
-  margin-top: 0.9rem;
+  gap: 0.5rem;
 }
 
-.barcode-svg {
-  display: block;
+.barcode-camera {
   width: 100%;
-  max-width: 320px;
-  height: auto;
+  max-width: 420px;
+  max-height: 320px;
   border: 1px solid var(--border);
-  background: #fff;
-}
-
-.label-sheet {
-  display: grid;
-  justify-content: start;
-}
-
-.disc-label {
-  width: 360px;
-  padding: 1rem;
-  border: 1px solid var(--border);
-  background: #fff;
-  color: #000;
-}
-
-.disc-label-code {
-  margin-bottom: 0.5rem;
-  font-size: 1.2rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-}
-
-.disc-label-meta {
-  margin-top: 0.55rem;
-  margin-bottom: 0.55rem;
-  font-size: 0.95rem;
-}
-
-.disc-label-titles {
-  display: grid;
-  gap: 0.2rem;
-}
-
-@media print {
-  .no-print,
-  .site-header,
-  .site-footer {
-    display: none !important;
-  }
-
-  body {
-    background: #fff;
-  }
-
-  .label-sheet {
-    display: block;
-  }
-
-  .disc-label {
-    border: 0;
-    padding: 0;
-  }
+  background: #111;
 }
 
 table {

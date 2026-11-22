@@ -1,9 +1,13 @@
 import "server-only";
 
 import { formatZoneLabel } from "@/lib/constants";
-import { parseInventoryZoneIdentifier } from "@/lib/inventory-zones";
 import { pool } from "@/lib/server/db";
 import { fetchOmdbTitleMetadataByImdbId } from "@/lib/server/omdb";
+import {
+  normalizeInventoryLocationPart as normalizeLocationPart,
+  normalizeInventoryRow as normalizeRowPart,
+  normalizeInventoryZone as normalizeZone,
+} from "@/lib/server/inventory/location-input";
 import { assertInventoryZoneIsAssignable } from "@/lib/server/inventory/zones";
 import {
   createHttpError,
@@ -13,9 +17,7 @@ import {
   normalizeAvailability,
   normalizeCast,
   normalizeFormat,
-  normalizeLateClass,
   normalizeMediaType,
-  normalizeMoney,
   normalizeSealed,
   optionalString,
 } from "@/lib/server/http";
@@ -125,6 +127,7 @@ type TitleRow = {
 type InventoryItemRow = {
   id: string;
   inventory_code: string | null;
+  upc_ean: string | null;
   format: string;
   sealed: boolean;
   availability: boolean;
@@ -183,89 +186,14 @@ function getSuggestedSortTitle(title: string) {
   return title.replace(/^(a|an|the)\s+/i, "").trim() || title.trim();
 }
 
-function buildLocationCode(zone: string, section: string, row: string) {
-  return `${zone}/${section}${row}`;
-}
-
 function getFormatPrioritySql(column: string) {
   return `(CASE ${column}::text WHEN '4k-uhd' THEN 0 WHEN 'blu-ray' THEN 1 ELSE 2 END)`;
-}
-
-async function allocateLowestInventoryCode(client: { query: typeof pool.query }) {
-  const result = await client.query<{ inventory_code: string }>(
-    `
-      SELECT LPAD(candidate.code::text, 6, '0') AS inventory_code
-      FROM generate_series(1, 999999) AS candidate(code)
-      LEFT JOIN inventory_items i
-        ON i.inventory_code = LPAD(candidate.code::text, 6, '0')
-      WHERE i.inventory_code IS NULL
-      ORDER BY candidate.code ASC
-      LIMIT 1;
-    `,
-  );
-
-  const inventoryCode = result.rows[0]?.inventory_code;
-
-  if (!inventoryCode) {
-    throw createHttpError(409, "No disc codes are available");
-  }
-
-  return inventoryCode;
 }
 
 function getPosterColor(title: string) {
   const palette = ["#3454b4", "#7b5d43", "#8d2f2b", "#223724", "#d0893d", "#5a6778"];
   const total = Array.from(title).reduce((sum, char) => sum + char.charCodeAt(0), 0);
   return palette[total % palette.length];
-}
-
-function normalizeZone(value: unknown) {
-  const raw = optionalString(value) ?? "";
-  const normalized =
-    raw.toLowerCase() === "shed"
-      ? "S"
-      : raw.toLowerCase() === "display"
-        ? "D"
-        : raw.toLowerCase() === "wall"
-          ? "W"
-          : raw.toUpperCase();
-
-  const parsed = parseInventoryZoneIdentifier(normalized);
-  if (!normalized) {
-    throw createHttpError(400, 'Field "zone" is required');
-  }
-  if (!parsed) {
-    throw createHttpError(400, 'Field "zone" is invalid');
-  }
-  return parsed;
-}
-
-function normalizeLocationPart(value: unknown, fieldName: "section" | "row") {
-  const normalized = optionalString(value)?.toUpperCase() ?? "";
-
-  if (!normalized) {
-    throw createHttpError(400, `Field "${fieldName}" is required`);
-  }
-
-  if (normalized.length < 1 || normalized.length > 2) {
-    throw createHttpError(400, `Field "${fieldName}" must be 1 or 2 characters`);
-  }
-
-  return normalized;
-}
-
-function normalizeRowPart(value: unknown) {
-  const normalized = optionalString(value)?.toUpperCase() ?? "";
-
-  if (!normalized) {
-    return "00";
-  }
-
-  if (normalized.length < 1 || normalized.length > 2) {
-    throw createHttpError(400, 'Field "row" must be 1 or 2 characters when provided');
-  }
-
-  return normalized;
 }
 
 function toUiLinkedTitle(title: {
@@ -296,6 +224,7 @@ function toUiInventoryItem(item: InventoryItemRow): InventoryItem {
   return {
     id: item.id,
     inventoryCode: item.inventory_code ?? "",
+    upcEan: item.upc_ean,
     format:
       item.format.toLowerCase() === "blu-ray"
         ? "blu-ray"
@@ -565,6 +494,7 @@ async function getInventoryItemsForTitle(titleId: string, options?: { reviewedOn
       SELECT
         i.id,
         i.inventory_code,
+        i.upc_ean,
         i.format::text,
         i.sealed,
         i.availability,
@@ -694,6 +624,7 @@ export async function getInventoryItemById(id: string) {
       SELECT
         i.id,
         i.inventory_code,
+        i.upc_ean,
         i.format::text,
         i.sealed,
         i.availability,
@@ -743,160 +674,6 @@ export async function getInventoryItemById(id: string) {
   }
 
   return toUiInventoryItem(item);
-}
-
-async function ensureTitlesExist(titleIds: string[]) {
-  if (titleIds.length === 0) {
-    throw createHttpError(400, 'Field "title_ids" must include at least one title');
-  }
-
-  const result = await pool.query<{ id: string }>(
-    `SELECT id FROM titles WHERE id = ANY($1::uuid[])`,
-    [titleIds],
-  );
-
-  if (result.rowCount !== titleIds.length) {
-    throw createHttpError(404, "One or more titles were not found");
-  }
-}
-
-function normalizeOptionalSeasonNumber(value: unknown, fieldName: string) {
-  if (value === undefined || value === null || value === "") {
-    return null;
-  }
-
-  if (typeof value === "number" && Number.isInteger(value) && value > 0) {
-    return value;
-  }
-
-  if (typeof value === "string" && value.trim() !== "") {
-    const parsed = Number.parseInt(value, 10);
-
-    if (Number.isInteger(parsed) && parsed > 0) {
-      return parsed;
-    }
-  }
-
-  throw createHttpError(400, `Field "${fieldName}" is invalid`);
-}
-
-function validateSeasonRange(title: {
-  titleId: string;
-  seasonStart: number | null;
-  seasonEnd: number | null;
-  episodeStart: number | null;
-  episodeEnd: number | null;
-}) {
-  if (title.seasonEnd !== null && title.seasonStart === null) {
-    throw createHttpError(400, 'Field "season_end" requires "season_start"');
-  }
-
-  if (
-    title.seasonStart !== null &&
-    title.seasonEnd !== null &&
-    title.seasonEnd < title.seasonStart
-  ) {
-    throw createHttpError(
-      400,
-      'Field "season_end" must be greater than or equal to "season_start"',
-    );
-  }
-
-  if (title.episodeEnd !== null && title.episodeStart === null) {
-    throw createHttpError(400, 'Field "episode_end" requires "episode_start"');
-  }
-
-  if (
-    title.episodeStart !== null &&
-    title.episodeEnd !== null &&
-    title.episodeEnd < title.episodeStart
-  ) {
-    throw createHttpError(
-      400,
-      'Field "episode_end" must be greater than or equal to "episode_start"',
-    );
-  }
-
-  if (title.episodeStart !== null && title.seasonStart === null) {
-    throw createHttpError(400, 'Field "episode_start" requires "season_start"');
-  }
-
-  const normalizedSeasonEnd = title.seasonEnd ?? title.seasonStart;
-
-  if (
-    title.episodeStart !== null &&
-    title.seasonStart !== null &&
-    normalizedSeasonEnd !== null &&
-    normalizedSeasonEnd !== title.seasonStart
-  ) {
-    throw createHttpError(400, "Episode ranges require a single season");
-  }
-
-  return {
-    titleId: title.titleId,
-    seasonStart: title.seasonStart,
-    seasonEnd: normalizedSeasonEnd,
-    episodeStart: title.episodeStart,
-    episodeEnd: title.episodeEnd ?? title.episodeStart,
-  };
-}
-
-function parseInventoryTitleLinks(body: Record<string, unknown>) {
-  if (Array.isArray(body.title_links)) {
-    const links = body.title_links.flatMap((value) => {
-      if (!value || typeof value !== "object" || Array.isArray(value)) {
-        return [];
-      }
-
-      const titleId = optionalString(value.title_id);
-
-      if (!titleId) {
-        return [];
-      }
-
-      return [
-        validateSeasonRange({
-          titleId,
-          seasonStart: normalizeOptionalSeasonNumber(value.season_start, "season_start"),
-          seasonEnd: normalizeOptionalSeasonNumber(value.season_end, "season_end"),
-          episodeStart: normalizeOptionalSeasonNumber(value.episode_start, "episode_start"),
-          episodeEnd: normalizeOptionalSeasonNumber(value.episode_end, "episode_end"),
-        }),
-      ];
-    });
-
-    if (links.length > 0) {
-      return links;
-    }
-  }
-
-  const titleIds = Array.isArray(body.title_ids)
-    ? body.title_ids.filter(
-        (value): value is string => typeof value === "string" && value.trim() !== "",
-      )
-    : typeof body.title_ids === "string"
-      ? body.title_ids
-          .split(",")
-          .map((value) => value.trim())
-          .filter(Boolean)
-      : typeof body.movie_id === "string" && body.movie_id.trim()
-        ? [body.movie_id.trim()]
-        : [];
-
-  const seasonStarts = Array.isArray(body.season_starts) ? body.season_starts : [];
-  const seasonEnds = Array.isArray(body.season_ends) ? body.season_ends : [];
-  const episodeStarts = Array.isArray(body.episode_starts) ? body.episode_starts : [];
-  const episodeEnds = Array.isArray(body.episode_ends) ? body.episode_ends : [];
-
-  return titleIds.map((titleId, index) =>
-    validateSeasonRange({
-      titleId,
-      seasonStart: normalizeOptionalSeasonNumber(seasonStarts[index], "season_start"),
-      seasonEnd: normalizeOptionalSeasonNumber(seasonEnds[index], "season_end"),
-      episodeStart: normalizeOptionalSeasonNumber(episodeStarts[index], "episode_start"),
-      episodeEnd: normalizeOptionalSeasonNumber(episodeEnds[index], "episode_end"),
-    }),
-  );
 }
 
 export async function checkDatabaseHealth() {
@@ -1638,6 +1415,7 @@ export async function getAlphabeticalStockSectionsFromDatabase(input: {
       SELECT
         i.id,
         i.inventory_code,
+        i.upc_ean,
         i.format::text,
         i.sealed,
         i.availability,
@@ -2016,6 +1794,7 @@ export async function listStockDiscsFromDatabase(input: {
       SELECT
         i.id,
         i.inventory_code,
+        i.upc_ean,
         i.format::text,
         i.sealed,
         i.availability,
@@ -2127,144 +1906,6 @@ export async function getStockViewOptionsFromDatabase() {
   return {
     sections: sectionResult.rows.map((row) => row.section),
   };
-}
-
-export async function createInventoryItemInDatabase(body: Record<string, unknown>) {
-  const titleLinks = parseInventoryTitleLinks(body);
-  const titleIds = titleLinks.map((link) => link.titleId);
-
-  const format = normalizeFormat(body.format);
-  const sealed =
-    body.sealed !== undefined
-      ? normalizeSealed(body.sealed)
-      : body.condition !== undefined
-        ? normalizeSealed(body.condition, "condition")
-        : false;
-  const zone = normalizeZone(body.zone);
-  await assertInventoryZoneIsAssignable(zone);
-  const section = normalizeLocationPart(body.section, "section");
-  const row = normalizeRowPart(body.row);
-  const locationCode = buildLocationCode(zone, section, row);
-  const notes = optionalString(body.notes) ?? "";
-  const lastRentedAt = optionalString(body.last_rented_at);
-  const availability =
-    body.availability === undefined ? true : normalizeAvailability(body.availability);
-  const reviewed = body.reviewed === undefined ? false : normalizeAvailability(body.reviewed);
-  const dayPrice = body.day_price === undefined ? 0 : normalizeMoney(body.day_price, "day_price");
-  const weekendPrice =
-    body.weekend_price === undefined ? 0 : normalizeMoney(body.weekend_price, "weekend_price");
-  const lateClass = body.late_class === undefined ? 0 : normalizeLateClass(body.late_class);
-
-  await ensureTitlesExist(titleIds);
-
-  const client = await pool.connect();
-
-  try {
-    await client.query("BEGIN");
-    const inventoryCode = await allocateLowestInventoryCode(client);
-
-    const inventoryResult = await client.query<{ id: string; inventory_code: string }>(
-      `
-        INSERT INTO inventory_items (
-          inventory_code,
-          availability,
-          reviewed,
-          sealed,
-          format,
-          zone,
-          section,
-          row,
-          location_code,
-          notes,
-          last_rented_at,
-          day_price,
-          weekend_price,
-          late_class
-        )
-        VALUES ($1, $2, $3, $4, $5::inventory_format, $6, $7, $8, $9, $10, $11::timestamptz, $12::numeric(10,2), $13::numeric(10,2), $14::integer)
-        RETURNING id, inventory_code;
-      `,
-      [
-        inventoryCode,
-        availability,
-        reviewed,
-        sealed,
-        format,
-        zone,
-        section,
-        row,
-        locationCode,
-        notes,
-        lastRentedAt,
-        dayPrice,
-        weekendPrice,
-        lateClass,
-      ],
-    );
-
-    const inventoryItemId = inventoryResult.rows[0].id;
-    const createdInventoryCode = inventoryResult.rows[0].inventory_code;
-
-    for (const [index, titleLink] of titleLinks.entries()) {
-      await client.query(
-        `
-          INSERT INTO inventory_item_titles (
-            inventory_item_id,
-            title_id,
-            season_start,
-            season_end,
-            episode_start,
-            episode_end,
-            position
-          )
-          VALUES ($1, $2, $3, $4, $5, $6, $7)
-        `,
-        [
-          inventoryItemId,
-          titleLink.titleId,
-          titleLink.seasonStart,
-          titleLink.seasonEnd,
-          titleLink.episodeStart,
-          titleLink.episodeEnd,
-          index + 1,
-        ],
-      );
-    }
-
-    await client.query("COMMIT");
-    return { id: inventoryItemId, inventoryCode: createdInventoryCode };
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
-}
-
-export async function generateInventoryCodeForDisc(id: string) {
-  const result = await pool.query<{ id: string; inventory_code: string }>(
-    `
-      UPDATE inventory_items
-      SET updated_at = NOW()
-      WHERE id = $1
-      RETURNING id, inventory_code;
-    `,
-    [id],
-  );
-
-  if (result.rowCount === 0) {
-    throw createHttpError(404, "Inventory item not found");
-  }
-
-  return {
-    id: result.rows[0].id,
-    inventoryCode: result.rows[0].inventory_code,
-  };
-}
-
-export async function clearInventoryCodeForDisc(_discId?: string) {
-  void _discId;
-  throw createHttpError(400, "Disc codes are permanent");
 }
 
 export async function updateMovieInDatabase(id: string, body: Record<string, unknown>) {
@@ -2494,122 +2135,6 @@ function requireNonEmptyString(value: unknown, fieldName: string) {
   }
 
   return normalizedValue;
-}
-
-export async function updateInventoryItemInDatabase(id: string, body: Record<string, unknown>) {
-  const titleLinks = body.title_links === undefined ? null : parseInventoryTitleLinks(body);
-  const updateValues = {
-    format: body.format === undefined ? null : normalizeFormat(body.format),
-    availability: body.availability === undefined ? null : normalizeAvailability(body.availability),
-    reviewed: body.reviewed === undefined ? null : normalizeAvailability(body.reviewed),
-    sealed:
-      body.sealed !== undefined
-        ? normalizeSealed(body.sealed)
-        : body.condition !== undefined
-          ? normalizeSealed(body.condition, "condition")
-          : null,
-    zone: body.zone === undefined ? null : normalizeZone(body.zone),
-    section: body.section === undefined ? null : normalizeLocationPart(body.section, "section"),
-    row: body.row === undefined ? null : normalizeRowPart(body.row),
-    notes: body.notes === undefined ? null : (optionalString(body.notes) ?? ""),
-    lastRentedAt: body.last_rented_at === undefined ? null : optionalString(body.last_rented_at),
-    dayPrice: body.day_price === undefined ? null : normalizeMoney(body.day_price, "day_price"),
-    weekendPrice:
-      body.weekend_price === undefined ? null : normalizeMoney(body.weekend_price, "weekend_price"),
-    lateClass: body.late_class === undefined ? null : normalizeLateClass(body.late_class),
-  };
-
-  if (updateValues.zone !== null) {
-    await assertInventoryZoneIsAssignable(updateValues.zone, id);
-  }
-
-  if (Object.values(updateValues).every((value) => value === null) && titleLinks === null) {
-    throw createHttpError(400, "Request body must include at least one updatable field");
-  }
-  const client = await pool.connect();
-
-  try {
-    await client.query("BEGIN");
-
-    const result = await client.query(
-      `
-        UPDATE inventory_items
-        SET
-          format = COALESCE($2::inventory_format, format),
-          availability = COALESCE($3, availability),
-          reviewed = COALESCE($4, reviewed),
-          sealed = COALESCE($5, sealed),
-          zone = COALESCE($6, zone),
-          section = COALESCE($7, section),
-          row = COALESCE($8, row),
-          location_code = CONCAT(COALESCE($6, zone), '/', COALESCE($7, section), COALESCE($8, row)),
-          notes = COALESCE($9, notes),
-          last_rented_at = COALESCE($10::timestamptz, last_rented_at),
-          day_price = COALESCE($11::numeric(10,2), day_price),
-          weekend_price = COALESCE($12::numeric(10,2), weekend_price),
-          late_class = COALESCE($13::integer, late_class),
-          updated_at = NOW()
-        WHERE id = $1
-        RETURNING id;
-      `,
-      [
-        id,
-        updateValues.format,
-        updateValues.availability,
-        updateValues.reviewed,
-        updateValues.sealed,
-        updateValues.zone,
-        updateValues.section,
-        updateValues.row,
-        updateValues.notes,
-        updateValues.lastRentedAt,
-        updateValues.dayPrice,
-        updateValues.weekendPrice,
-        updateValues.lateClass,
-      ],
-    );
-
-    if (result.rowCount === 0) {
-      throw createHttpError(404, "Inventory item not found");
-    }
-
-    if (titleLinks !== null) {
-      for (const titleLink of titleLinks) {
-        const updateLinkResult = await client.query(
-          `
-            UPDATE inventory_item_titles
-            SET season_start = $3,
-                season_end = $4,
-                episode_start = $5,
-                episode_end = $6
-            WHERE inventory_item_id = $1
-              AND title_id = $2
-            RETURNING inventory_item_id;
-          `,
-          [
-            id,
-            titleLink.titleId,
-            titleLink.seasonStart,
-            titleLink.seasonEnd,
-            titleLink.episodeStart,
-            titleLink.episodeEnd,
-          ],
-        );
-
-        if (updateLinkResult.rowCount === 0) {
-          throw createHttpError(404, "One or more linked titles were not found for the disc");
-        }
-      }
-    }
-
-    await client.query("COMMIT");
-    return { id };
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
 }
 
 export async function bulkUpdateMovieInventoryInDatabase(

@@ -3,11 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import {
-  clearInventoryCodeForDisc,
-  generateInventoryCodeForDisc,
-  updateInventoryItemInDatabase,
-} from "@/lib/server/store";
+import { updateInventoryItemInDatabase } from "@/lib/server/inventory/items";
 
 function getString(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -47,6 +43,7 @@ export async function updateDisc(formData: FormData) {
     weekend_price: getString(formData, "weekendPrice"),
     late_class: getString(formData, "lateClass"),
     notes: getString(formData, "notes"),
+    upc_ean: getString(formData, "upcEan"),
   });
 
   revalidatePath("/inventory");
@@ -67,42 +64,4 @@ export async function updateDisc(formData: FormData) {
   }
 
   redirect("/inventory");
-}
-
-export async function generateDiscBarcode(formData: FormData) {
-  const discId = getString(formData, "discId");
-  const returnTitleId = getString(formData, "returnTitleId");
-  const printAfter = getString(formData, "printAfter") === "true";
-
-  await generateInventoryCodeForDisc(discId);
-
-  revalidatePath("/inventory");
-  revalidatePath(`/inventory/discs/${discId}`);
-
-  if (returnTitleId) {
-    revalidatePath(`/inventory/${returnTitleId}`);
-  }
-
-  if (printAfter) {
-    redirect(`/inventory/discs/${discId}/label?print=true`);
-  }
-
-  redirect(`/inventory/discs/${discId}`);
-}
-
-export async function clearDiscBarcode(formData: FormData) {
-  const discId = getString(formData, "discId");
-  const returnTitleId = getString(formData, "returnTitleId");
-
-  await clearInventoryCodeForDisc(discId);
-
-  revalidatePath("/inventory");
-  revalidatePath(`/inventory/discs/${discId}`);
-  revalidatePath(`/inventory/discs/${discId}/label`);
-
-  if (returnTitleId) {
-    revalidatePath(`/inventory/${returnTitleId}`);
-  }
-
-  redirect(`/inventory/discs/${discId}`);
 }

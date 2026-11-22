@@ -44,8 +44,9 @@ Make inventory faster and more reliable before relying on it for checkout.
 
 - Allow staff to create and edit custom titles when there is no TMDB record, with clear source/provenance and duplicate checks.
 - As title-entry work begins, move the relevant search, duplicate-detection, and title-write operations out of `lib/server/store.ts` into a catalog service; keep any shared title/disc projection helpers in a clearly owned shared module.
-- Add barcode lookup as an optional aid to title entry; staff must be able to review and correct returned metadata.
-- Support browser-camera barcode scanning on mobile as the initial scanning workflow. Keep scanner input behind a small shared interface so keyboard-wedge USB scanners and manual barcode entry can be added without changing checkout rules.
+- Store UPC/EAN on each physical inventory copy. Identical releases may share a repeated code, and a title may have different codes across releases.
+- Add UPC/EAN entry to disc intake and editing, with browser-camera scanning where supported and a manual field for fallback and keyboard-wedge scanners. Defer external barcode lookup and metadata services.
+- Remove printed internal barcode labels. Keep `inventory_code` as the app's internal staff identifier.
 - Provide staff-managed location configuration for zones, sections, and rows, including adding, renaming, deactivating, and validating options.
 - Provide a guided stock-move workflow that records the old and new location, affected items, staff member, time, and any exceptions. Avoid silently changing location history.
 - As location and stock-move work begins, move the affected stock queries and mutations out of `lib/server/store.ts` into inventory/location services; keep this extraction within the feature task.
@@ -85,6 +86,7 @@ Make pricing rules explicit, reproducible, and reviewable.
 ### 6. Checkout experience and service integrations
 
 - Build a fast staff checkout flow for desktop and mobile, with camera scanning on mobile and a manual barcode field as a fallback.
+- Match scanned UPC/EAN values to available copies; when identical copies share a code, any available copy can be selected. Store the selected inventory item on the transaction so returns resolve against the exact rented copy.
 - Make the scan-to-cart loop robust: clear match/no-match feedback, duplicate scan behavior, quantity rules, correction/removal, and confirmation before completion.
 - Add customer search/create flows that minimise data exposure and prevent accidental duplicate records.
 - Integrate mailing/SMS only after choosing a provider, defining message purposes and consent/opt-out behavior, and deciding what information may be included in receipts or reminders.
