@@ -1,3 +1,5 @@
+import "server-only";
+
 import type { MediaType } from "@/lib/types";
 import { createHttpError } from "@/lib/server/http";
 
@@ -146,8 +148,8 @@ export async function fetchTmdbTitleDraft(input: string): Promise<TmdbTitleDraft
   const normalizedTitle = title.title ?? title.name ?? "";
   const director =
     parsed.mediaType === "series"
-      ? title.created_by?.[0]?.name ?? ""
-      : title.credits?.crew?.find((member) => member.job === "Director")?.name ?? "";
+      ? (title.created_by?.[0]?.name ?? "")
+      : (title.credits?.crew?.find((member) => member.job === "Director")?.name ?? "");
 
   return {
     tmdbId: title.id.toString(),

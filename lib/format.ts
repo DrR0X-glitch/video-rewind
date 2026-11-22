@@ -45,10 +45,7 @@ export function formatImdbRating(imdbRating?: number): string {
     : "—";
 }
 
-export function formatSeasonRange(
-  seasonStart?: number,
-  seasonEnd?: number,
-): string {
+export function formatSeasonRange(seasonStart?: number, seasonEnd?: number): string {
   if (typeof seasonStart !== "number") {
     return "";
   }
@@ -60,10 +57,7 @@ export function formatSeasonRange(
   return `Seasons ${seasonStart}-${seasonEnd}`;
 }
 
-export function formatEpisodeRange(
-  episodeStart?: number,
-  episodeEnd?: number,
-): string {
+export function formatEpisodeRange(episodeStart?: number, episodeEnd?: number): string {
   if (typeof episodeStart !== "number") {
     return "";
   }

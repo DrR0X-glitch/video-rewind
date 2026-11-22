@@ -2,7 +2,13 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 import { filterMoviesPage } from "@/lib/data";
-import { ensureObject, jsonError, parseBoolean, parseInteger, requireString } from "@/lib/server/http";
+import {
+  ensureObject,
+  jsonError,
+  parseBoolean,
+  parseInteger,
+  requireString,
+} from "@/lib/server/http";
 import { createMovieInDatabase } from "@/lib/server/store";
 
 function parseDecade(value: string | null) {
@@ -86,9 +92,10 @@ export async function POST(request: Request) {
     const movieId = await createMovieInDatabase({
       tmdbId: requireString(body.tmdb_id, "tmdb_id"),
       imdbId: typeof body.imdb_id === "string" ? body.imdb_id : undefined,
-      imdbRating: typeof parsedImdbRating === "number" && Number.isFinite(parsedImdbRating)
-        ? parsedImdbRating
-        : undefined,
+      imdbRating:
+        typeof parsedImdbRating === "number" && Number.isFinite(parsedImdbRating)
+          ? parsedImdbRating
+          : undefined,
       mediaType:
         typeof body.media_type === "string" && body.media_type.trim() !== ""
           ? body.media_type
@@ -119,23 +126,30 @@ export async function POST(request: Request) {
           ? {
               tmdbId: collectionInput.tmdbId,
               name: collectionInput.name,
-              overview: typeof collectionInput.overview === "string" ? collectionInput.overview : "",
-              posterPath: typeof collectionInput.posterPath === "string" ? collectionInput.posterPath : null,
+              overview:
+                typeof collectionInput.overview === "string" ? collectionInput.overview : "",
+              posterPath:
+                typeof collectionInput.posterPath === "string" ? collectionInput.posterPath : null,
               titles: Array.isArray(collectionInput.titles)
                 ? collectionInput.titles.flatMap((title) =>
                     title &&
                     typeof title === "object" &&
                     typeof title.tmdbId === "string" &&
                     typeof title.title === "string"
-                      ? [{
-                          tmdbId: title.tmdbId,
-                          mediaType: "movie" as const,
-                          title: title.title,
-                          sortTitle: typeof title.sortTitle === "string" ? title.sortTitle : title.title,
-                          overview: typeof title.overview === "string" ? title.overview : "",
-                          releaseDate: typeof title.releaseDate === "string" ? title.releaseDate : "",
-                          posterPath: typeof title.posterPath === "string" ? title.posterPath : null,
-                        }]
+                      ? [
+                          {
+                            tmdbId: title.tmdbId,
+                            mediaType: "movie" as const,
+                            title: title.title,
+                            sortTitle:
+                              typeof title.sortTitle === "string" ? title.sortTitle : title.title,
+                            overview: typeof title.overview === "string" ? title.overview : "",
+                            releaseDate:
+                              typeof title.releaseDate === "string" ? title.releaseDate : "",
+                            posterPath:
+                              typeof title.posterPath === "string" ? title.posterPath : null,
+                          },
+                        ]
                       : [],
                   )
                 : [],

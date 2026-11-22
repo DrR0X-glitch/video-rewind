@@ -5,9 +5,7 @@ import { StockBulkControls } from "@/components/stock-bulk-controls";
 import { StockTableBody } from "@/components/stock-table-body";
 import { FORMAT_OPTIONS, ZONE_OPTIONS, formatZoneLabel } from "@/lib/constants";
 import { listStockDiscs } from "@/lib/data";
-import {
-  formatDiscFormat,
-} from "@/lib/format";
+import { formatDiscFormat } from "@/lib/format";
 
 type StockPageProps = {
   searchParams: Promise<{
@@ -61,34 +59,46 @@ const primaryOptions = [
   { value: "duplicate", label: "Duplicate" },
 ] as const;
 
-const sortOptions = new Set(["disc", "format", "primary", "titles", "order", "availability", "updated", "location", "sealed"]);
+const sortOptions = new Set([
+  "disc",
+  "format",
+  "primary",
+  "titles",
+  "order",
+  "availability",
+  "updated",
+  "location",
+  "sealed",
+]);
 
 export default async function InventoryStockPage({ searchParams }: StockPageProps) {
   const params = await searchParams;
   const selectedFormats = getSelectedValues(params.format, FORMAT_OPTIONS);
   const selectedZones = getSelectedValues(params.zone, ZONE_OPTIONS);
-  const selectedSealedStates = getSelectedValues(
-    params.sealed,
-    ["true", "false"] as const,
-  );
-  const selectedPreset = presetOptions.some((option) => option.id === params.preset) ? params.preset ?? "all" : "all";
-  const selectedAvailability =
-    typeof params.availability === "string" && availabilityOptions.some((option) => option.value === params.availability)
-      ? params.availability
+  const selectedSealedStates = getSelectedValues(params.sealed, ["true", "false"] as const);
+  const selectedPreset = presetOptions.some((option) => option.id === params.preset)
+    ? (params.preset ?? "all")
     : "all";
-  const selectedEdited =
-    editedOptions.some((option) => option.value === params.edited)
-      ? params.edited ?? "all"
+  const selectedAvailability =
+    typeof params.availability === "string" &&
+    availabilityOptions.some((option) => option.value === params.availability)
+      ? params.availability
       : "all";
+  const selectedEdited = editedOptions.some((option) => option.value === params.edited)
+    ? (params.edited ?? "all")
+    : "all";
   const selectedPrimary =
-    typeof params.primary === "string" && primaryOptions.some((option) => option.value === params.primary)
+    typeof params.primary === "string" &&
+    primaryOptions.some((option) => option.value === params.primary)
       ? params.primary
       : "all";
-  const selectedSort = sortOptions.has(params.sort ?? "") ? params.sort ?? "updated" : "updated";
+  const selectedSort = sortOptions.has(params.sort ?? "") ? (params.sort ?? "updated") : "updated";
   const selectedDir = params.dir === "asc" ? "asc" : "desc";
   const showAll = params.showAll === "true";
   const selectedPage =
-    typeof params.page === "string" && /^\d+$/.test(params.page) && Number.parseInt(params.page, 10) > 0
+    typeof params.page === "string" &&
+    /^\d+$/.test(params.page) &&
+    Number.parseInt(params.page, 10) > 0
       ? Number.parseInt(params.page, 10)
       : 1;
   const query = params.q?.trim() ?? "";
@@ -152,7 +162,8 @@ export default async function InventoryStockPage({ searchParams }: StockPageProp
   const allMatchingIds = allMatchingItems.map((item) => item.id);
   const totalPages = showAll ? 1 : Math.max(1, Math.ceil(totalCount / STOCK_PAGE_SIZE));
   const currentPage = showAll ? 1 : Math.min(selectedPage, totalPages);
-  const pageStart = totalCount === 0 ? 0 : (currentPage - 1) * (showAll ? totalCount || 1 : STOCK_PAGE_SIZE) + 1;
+  const pageStart =
+    totalCount === 0 ? 0 : (currentPage - 1) * (showAll ? totalCount || 1 : STOCK_PAGE_SIZE) + 1;
   const pageEnd = totalCount === 0 ? 0 : pageStart + items.length - 1;
 
   const bulkFormId = "stock-bulk-form";
@@ -346,68 +357,47 @@ export default async function InventoryStockPage({ searchParams }: StockPageProp
             {selectedSealedStates.map((sealed) => (
               <input key={sealed} type="hidden" name="sealed" value={sealed} />
             ))}
-          <div className="section-heading stock-results-bar">
-            <p className="muted utility-row">
-              {totalCount === 0 ? "Showing 0 entries" : `Showing ${pageStart}-${pageEnd} of ${totalCount}`}
-            </p>
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th className="selection-column">Select</th>
-                <th>{renderSortLink("Disc", "disc", selectedSort, selectedDir, params)}</th>
-                <th>{renderSortLink("Format", "format", selectedSort, selectedDir, params)}</th>
-                <th>{renderSortLink("Titles", "order", selectedSort, selectedDir, params)}</th>
-                <th>{renderSortLink("Primary", "primary", selectedSort, selectedDir, params)}</th>
-                <th>{renderSortLink("Sealed", "sealed", selectedSort, selectedDir, params)}</th>
-                <th>{renderSortLink("Last Edited", "updated", selectedSort, selectedDir, params)}</th>
-                <th>{renderSortLink("Location", "location", selectedSort, selectedDir, params)}</th>
-                <th>Notes</th>
-                <th></th>
-              </tr>
-            </thead>
-            <StockTableBody
-              bulkFormId={bulkFormId}
-              currentStockHref={currentStockHref}
-              items={items}
-              showAvailabilityColumn={false}
-              showPrimaryColumn
-            />
-          </table>
+            <div className="section-heading stock-results-bar">
+              <p className="muted utility-row">
+                {totalCount === 0
+                  ? "Showing 0 entries"
+                  : `Showing ${pageStart}-${pageEnd} of ${totalCount}`}
+              </p>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th className="selection-column">Select</th>
+                  <th>{renderSortLink("Disc", "disc", selectedSort, selectedDir, params)}</th>
+                  <th>{renderSortLink("Format", "format", selectedSort, selectedDir, params)}</th>
+                  <th>{renderSortLink("Titles", "order", selectedSort, selectedDir, params)}</th>
+                  <th>{renderSortLink("Primary", "primary", selectedSort, selectedDir, params)}</th>
+                  <th>{renderSortLink("Sealed", "sealed", selectedSort, selectedDir, params)}</th>
+                  <th>
+                    {renderSortLink("Last Edited", "updated", selectedSort, selectedDir, params)}
+                  </th>
+                  <th>
+                    {renderSortLink("Location", "location", selectedSort, selectedDir, params)}
+                  </th>
+                  <th>Notes</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <StockTableBody
+                bulkFormId={bulkFormId}
+                currentStockHref={currentStockHref}
+                items={items}
+                showAvailabilityColumn={false}
+                showPrimaryColumn
+              />
+            </table>
             <div className="section stock-table-footer">
               <StockBulkControls allMatchingIds={allMatchingIds} />
               {totalPages > 1 || showAll ? (
                 <div className="header-actions stock-pagination">
                   {showAll ? (
-                    <Link href={buildStockHref({
-                      availability: selectedAvailability,
-                      edited: selectedEdited,
-                      primary: selectedPrimary,
-                      sealedStates: selectedSealedStates,
-                      reviewedState: "true",
-                      dir: selectedDir,
-                      formats: selectedFormats,
-                      page: 1,
-                      q: query,
-                      section,
-                      row,
-                      sort: selectedSort,
-                      zones: selectedZones,
-                    })}>Paginate</Link>
-                  ) : (
-                    <>
-                      {previousPageHref ? (
-                        <Link href={previousPageHref}>Previous</Link>
-                      ) : (
-                        <span className="muted">Previous</span>
-                      )}
-                      <span className="muted">Page {currentPage} of {totalPages}</span>
-                      {nextPageHref ? (
-                        <Link href={nextPageHref}>Next</Link>
-                      ) : (
-                        <span className="muted">Next</span>
-                      )}
-                      <Link href={buildStockHref({
+                    <Link
+                      href={buildStockHref({
                         availability: selectedAvailability,
                         edited: selectedEdited,
                         primary: selectedPrimary,
@@ -416,13 +406,50 @@ export default async function InventoryStockPage({ searchParams }: StockPageProp
                         dir: selectedDir,
                         formats: selectedFormats,
                         page: 1,
-                        showAll: true,
                         q: query,
                         section,
                         row,
                         sort: selectedSort,
                         zones: selectedZones,
-                      })}>Show All</Link>
+                      })}
+                    >
+                      Paginate
+                    </Link>
+                  ) : (
+                    <>
+                      {previousPageHref ? (
+                        <Link href={previousPageHref}>Previous</Link>
+                      ) : (
+                        <span className="muted">Previous</span>
+                      )}
+                      <span className="muted">
+                        Page {currentPage} of {totalPages}
+                      </span>
+                      {nextPageHref ? (
+                        <Link href={nextPageHref}>Next</Link>
+                      ) : (
+                        <span className="muted">Next</span>
+                      )}
+                      <Link
+                        href={buildStockHref({
+                          availability: selectedAvailability,
+                          edited: selectedEdited,
+                          primary: selectedPrimary,
+                          sealedStates: selectedSealedStates,
+                          reviewedState: "true",
+                          dir: selectedDir,
+                          formats: selectedFormats,
+                          page: 1,
+                          showAll: true,
+                          q: query,
+                          section,
+                          row,
+                          sort: selectedSort,
+                          zones: selectedZones,
+                        })}
+                      >
+                        Show All
+                      </Link>
                     </>
                   )}
                 </div>
@@ -445,9 +472,12 @@ function renderSortLink(
   const nextDir = selectedSort === column && selectedDir === "asc" ? "desc" : "asc";
   const href = buildStockHref({
     availability: typeof params.availability === "string" ? params.availability : "all",
-    edited: editedOptions.some((option) => option.value === params.edited) ? params.edited ?? "all" : "all",
+    edited: editedOptions.some((option) => option.value === params.edited)
+      ? (params.edited ?? "all")
+      : "all",
     primary:
-      typeof params.primary === "string" && primaryOptions.some((option) => option.value === params.primary)
+      typeof params.primary === "string" &&
+      primaryOptions.some((option) => option.value === params.primary)
         ? params.primary
         : "all",
     sealedStates: getSelectedValues(params.sealed, ["true", "false"] as const),
@@ -487,9 +517,11 @@ function buildStockHref(input: {
   const params = new URLSearchParams();
 
   if (input.q && input.q.trim()) params.set("q", input.q.trim());
-  if (input.section && input.section.trim()) params.set("section", input.section.trim().toUpperCase());
+  if (input.section && input.section.trim())
+    params.set("section", input.section.trim().toUpperCase());
   if (input.row && input.row.trim()) params.set("row", input.row.trim().toUpperCase());
-  if (input.availability && input.availability !== "all") params.set("availability", input.availability);
+  if (input.availability && input.availability !== "all")
+    params.set("availability", input.availability);
   if (input.edited && input.edited !== "all") params.set("edited", input.edited);
   if (input.primary && input.primary !== "all") params.set("primary", input.primary);
   for (const format of input.formats ?? []) params.append("format", format);
@@ -504,12 +536,13 @@ function buildStockHref(input: {
   return query ? `/inventory/stock?${query}` : "/inventory/stock";
 }
 
-function getSelectedValues<T extends string>(input: string | string[] | undefined, allowed: readonly T[]) {
+function getSelectedValues<T extends string>(
+  input: string | string[] | undefined,
+  allowed: readonly T[],
+) {
   const values = Array.isArray(input) ? input : typeof input === "string" ? [input] : [];
 
-  return Array.from(
-    new Set(values.filter((value): value is T => allowed.includes(value as T))),
-  );
+  return Array.from(new Set(values.filter((value): value is T => allowed.includes(value as T))));
 }
 
 function MultiSelectDropdown({
@@ -613,9 +646,9 @@ function applyPresetToFilters(
     sealedStates: string[];
     sort: string;
     dir: string;
-  q: string;
-  section: string;
-  row: string;
+    q: string;
+    section: string;
+    row: string;
   },
 ) {
   if (preset === "all") {

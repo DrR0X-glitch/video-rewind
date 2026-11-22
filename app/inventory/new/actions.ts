@@ -17,9 +17,7 @@ function getString(formData: FormData, key: string) {
 }
 
 function getStringList(formData: FormData, key: string) {
-  return formData
-    .getAll(key)
-    .flatMap((value) => (typeof value === "string" ? [value.trim()] : []));
+  return formData.getAll(key).flatMap((value) => (typeof value === "string" ? [value.trim()] : []));
 }
 
 export async function addDiscToExistingTitle(formData: FormData) {
@@ -80,7 +78,13 @@ export async function createTitleAndAddToDisc(formData: FormData) {
   if (duplicateId) {
     const existingTitleIds = getString(formData, "titleIds");
     const mergedDuplicateIds = Array.from(
-      new Set([duplicateId, ...existingTitleIds.split(",").map((id) => id.trim()).filter(Boolean)]),
+      new Set([
+        duplicateId,
+        ...existingTitleIds
+          .split(",")
+          .map((id) => id.trim())
+          .filter(Boolean),
+      ]),
     ).join(",");
     redirect(`/inventory/new?selected=${encodeURIComponent(mergedDuplicateIds)}`);
   }
@@ -102,7 +106,13 @@ export async function createTitleAndAddToDisc(formData: FormData) {
 
   const existingTitleIds = getString(formData, "titleIds");
   const mergedTitleIds = Array.from(
-    new Set([titleId, ...existingTitleIds.split(",").map((id) => id.trim()).filter(Boolean)]),
+    new Set([
+      titleId,
+      ...existingTitleIds
+        .split(",")
+        .map((id) => id.trim())
+        .filter(Boolean),
+    ]),
   ).join(",");
 
   revalidatePath("/");

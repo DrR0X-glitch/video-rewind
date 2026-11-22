@@ -18,18 +18,26 @@ type InventoryPageProps = {
 export default async function InventoryPage({ searchParams }: InventoryPageProps) {
   const params = await searchParams;
   const selectedPage =
-    typeof params.page === "string" && /^\d+$/.test(params.page) && Number.parseInt(params.page, 10) > 0
+    typeof params.page === "string" &&
+    /^\d+$/.test(params.page) &&
+    Number.parseInt(params.page, 10) > 0
       ? Number.parseInt(params.page, 10)
       : 1;
-  const titlePage = await searchInventoryTitlesPage(params.search, selectedPage, INVENTORY_PAGE_SIZE);
+  const titlePage = await searchInventoryTitlesPage(
+    params.search,
+    selectedPage,
+    INVENTORY_PAGE_SIZE,
+  );
   const titles = titlePage.items;
   const totalCount = titlePage.totalCount;
   const totalPages = Math.max(1, Math.ceil(totalCount / INVENTORY_PAGE_SIZE));
   const currentPage = Math.min(selectedPage, totalPages);
   const pageStart = totalCount === 0 ? 0 : (currentPage - 1) * INVENTORY_PAGE_SIZE + 1;
   const pageEnd = totalCount === 0 ? 0 : pageStart + titles.length - 1;
-  const previousPageHref = currentPage > 1 ? buildInventoryHref(params.search, currentPage - 1) : null;
-  const nextPageHref = currentPage < totalPages ? buildInventoryHref(params.search, currentPage + 1) : null;
+  const previousPageHref =
+    currentPage > 1 ? buildInventoryHref(params.search, currentPage - 1) : null;
+  const nextPageHref =
+    currentPage < totalPages ? buildInventoryHref(params.search, currentPage + 1) : null;
 
   return (
     <div className="inventory-layout">
@@ -104,7 +112,9 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
           </table>
           <div className="section stock-table-footer">
             <p className="muted utility-row">
-              {totalCount === 0 ? "Showing 0 titles" : `Showing ${pageStart}-${pageEnd} of ${totalCount}`}
+              {totalCount === 0
+                ? "Showing 0 titles"
+                : `Showing ${pageStart}-${pageEnd} of ${totalCount}`}
             </p>
             {totalPages > 1 ? (
               <div className="header-actions stock-pagination">
@@ -113,7 +123,9 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
                 ) : (
                   <span className="muted">Previous</span>
                 )}
-                <span className="muted">Page {currentPage} of {totalPages}</span>
+                <span className="muted">
+                  Page {currentPage} of {totalPages}
+                </span>
                 {nextPageHref ? (
                   <Link href={nextPageHref}>Next</Link>
                 ) : (

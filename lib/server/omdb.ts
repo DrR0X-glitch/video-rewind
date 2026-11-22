@@ -1,3 +1,5 @@
+import "server-only";
+
 import { createHttpError } from "@/lib/server/http";
 
 type OmdbTitleResponse = {

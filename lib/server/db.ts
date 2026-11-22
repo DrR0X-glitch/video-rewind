@@ -1,3 +1,5 @@
+import "server-only";
+
 import { Pool } from "pg";
 
 declare global {
@@ -17,6 +19,20 @@ function getConnectionConfig() {
     return {
       connectionString: process.env.DATABASE_URL,
     };
+  }
+
+  const hasExplicitPostgresConfig = Boolean(
+    process.env.PGHOST && process.env.PGDATABASE && process.env.PGUSER && process.env.PGPASSWORD,
+  );
+
+  if (process.env.NODE_ENV === "production" && !hasExplicitPostgresConfig) {
+    if (process.env.NEXT_PHASE === "phase-production-build") {
+      return {
+        connectionString: "postgres://build:build@127.0.0.1:1/build-only",
+      };
+    }
+
+    throw new Error("Set DATABASE_URL or explicit PG* variables in production.");
   }
 
   return {

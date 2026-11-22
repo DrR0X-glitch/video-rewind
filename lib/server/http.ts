@@ -1,3 +1,5 @@
+import "server-only";
+
 import { NextResponse } from "next/server";
 
 import type { MediaType } from "@/lib/types";
@@ -76,11 +78,7 @@ export function normalizeSealed(value: unknown, fieldName = "sealed") {
   if (typeof value === "string") {
     const normalizedValue = value.trim().toLowerCase();
 
-    if (
-      normalizedValue === "true" ||
-      normalizedValue === "sealed" ||
-      normalizedValue === "yes"
-    ) {
+    if (normalizedValue === "true" || normalizedValue === "sealed" || normalizedValue === "yes") {
       return true;
     }
 

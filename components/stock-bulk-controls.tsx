@@ -27,7 +27,9 @@ export function StockBulkControls({ allMatchingIds }: StockBulkControlsProps) {
       const detail = (event as CustomEvent<{ ids?: string[] }>).detail;
       setSelectedIds(
         Array.isArray(detail?.ids)
-          ? detail.ids.filter((value): value is string => typeof value === "string" && value.trim() !== "")
+          ? detail.ids.filter(
+              (value): value is string => typeof value === "string" && value.trim() !== "",
+            )
           : [],
       );
     }
@@ -62,16 +64,20 @@ export function StockBulkControls({ allMatchingIds }: StockBulkControlsProps) {
   return (
     <div className="stock-bulk-controls">
       <div className="bulk-toolbar">
-        <button type="button" onClick={openDialog}>Bulk Edit</button>
+        <button type="button" onClick={openDialog}>
+          Bulk Edit
+        </button>
         <button type="button" onClick={selectAllFiltered} disabled={allMatchingIds.length === 0}>
           Select All Filtered
         </button>
-        <button type="button" onClick={clearSelection}>Clear Selected</button>
-        <button type="submit" name="action" value="delete">Delete Selected</button>
+        <button type="button" onClick={clearSelection}>
+          Clear Selected
+        </button>
+        <button type="submit" name="action" value="delete">
+          Delete Selected
+        </button>
       </div>
-      <p className="muted stock-selected-count">
-        {selectedIds.length} selected
-      </p>
+      <p className="muted stock-selected-count">{selectedIds.length} selected</p>
       {selectedIds.map((inventoryId) => (
         <input key={inventoryId} type="hidden" name="inventoryIds" value={inventoryId} />
       ))}
@@ -178,8 +184,12 @@ export function StockBulkControls({ allMatchingIds }: StockBulkControlsProps) {
               </label>
 
               <div className="bulk-edit-dialog-actions">
-                <button type="button" onClick={closeDialog}>Cancel</button>
-                <button type="submit" name="action" value="edit">Save Changes</button>
+                <button type="button" onClick={closeDialog}>
+                  Cancel
+                </button>
+                <button type="submit" name="action" value="edit">
+                  Save Changes
+                </button>
               </div>
             </div>
           </div>

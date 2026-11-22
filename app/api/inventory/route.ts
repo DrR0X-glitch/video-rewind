@@ -9,7 +9,8 @@ export async function GET(request: NextRequest) {
   try {
     const query = request.nextUrl.searchParams.get("search")?.trim() || undefined;
     const page = parseInteger(request.nextUrl.searchParams.get("page"), "page") ?? undefined;
-    const pageSize = parseInteger(request.nextUrl.searchParams.get("pageSize"), "pageSize") ?? undefined;
+    const pageSize =
+      parseInteger(request.nextUrl.searchParams.get("pageSize"), "pageSize") ?? undefined;
     const results = await searchInventoryTitlesPage(query, page, pageSize);
     return NextResponse.json(results);
   } catch (error) {

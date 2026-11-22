@@ -52,7 +52,11 @@ export function StockTableBody({
   useEffect(() => {
     function handleSetSelection(event: Event) {
       const detail = (event as CustomEvent<{ ids?: string[] }>).detail;
-      const ids = Array.isArray(detail?.ids) ? detail.ids.filter((value): value is string => typeof value === "string" && value.trim() !== "") : [];
+      const ids = Array.isArray(detail?.ids)
+        ? detail.ids.filter(
+            (value): value is string => typeof value === "string" && value.trim() !== "",
+          )
+        : [];
 
       setSelectedIds(new Set(ids));
       lastSelectedIndexRef.current = null;
@@ -79,9 +83,7 @@ export function StockTableBody({
     nextChecked: boolean,
   ) {
     const rangeAnchor =
-      shiftKey && lastSelectedIndexRef.current !== null
-        ? lastSelectedIndexRef.current
-        : null;
+      shiftKey && lastSelectedIndexRef.current !== null ? lastSelectedIndexRef.current : null;
 
     setSelectedIds((currentSelectedIds) => {
       const nextSelectedIds = new Set(currentSelectedIds);
@@ -118,7 +120,11 @@ export function StockTableBody({
 
   if (items.length === 0) {
     const columnCount =
-      7 + (showAvailabilityColumn ? 1 : 0) + (showPrimaryColumn ? 1 : 0) + (showReviewedColumn ? 1 : 0) + 1;
+      7 +
+      (showAvailabilityColumn ? 1 : 0) +
+      (showPrimaryColumn ? 1 : 0) +
+      (showReviewedColumn ? 1 : 0) +
+      1;
 
     return (
       <tbody>
@@ -142,16 +148,14 @@ export function StockTableBody({
               checked={selectedIds.has(item.id)}
               readOnly
               onClick={(event) =>
-                handleSelectionChange(
-                  item.id,
-                  itemIndex,
-                  event.shiftKey,
-                  !selectedIds.has(item.id),
-                )}
+                handleSelectionChange(item.id, itemIndex, event.shiftKey, !selectedIds.has(item.id))
+              }
             />
           </td>
           <td>
-            <Link href={`/inventory/discs/${item.id}?returnTo=${encodeURIComponent(`${currentStockHref}#disc-${item.id}`)}`}>
+            <Link
+              href={`/inventory/discs/${item.id}?returnTo=${encodeURIComponent(`${currentStockHref}#disc-${item.id}`)}`}
+            >
               {formatInventoryShortIdentifier(item)}
             </Link>
           </td>
@@ -159,7 +163,7 @@ export function StockTableBody({
           <td>
             <div className="stock-title-cell">
               <div className="stock-title-list">
-                {item.linkedTitles.map((title) => (
+                {item.linkedTitles.map((title) =>
                   titleDisplayMode === "review" ? (
                     <span key={title.id}>
                       <strong>{formatLinkedTitleLabel(title)}</strong>
@@ -168,8 +172,8 @@ export function StockTableBody({
                     </span>
                   ) : (
                     <span key={title.id}>{formatLinkedTitleLabel(title)}</span>
-                  )
-                ))}
+                  ),
+                )}
               </div>
               {item.collectionName ? (
                 <span className="muted">
@@ -179,7 +183,11 @@ export function StockTableBody({
             </div>
           </td>
           {showAvailabilityColumn ? (
-            <td><span className={`status-pill status-${getAvailabilityTone(item.availability)}`}>{formatAvailability(item.availability)}</span></td>
+            <td>
+              <span className={`status-pill status-${getAvailabilityTone(item.availability)}`}>
+                {formatAvailability(item.availability)}
+              </span>
+            </td>
           ) : null}
           {showPrimaryColumn ? (
             <td suppressHydrationWarning>
@@ -201,9 +209,7 @@ export function StockTableBody({
                 {rowAction.label}
               </button>
             ) : (
-              <Link href={`/inventory/discs/${item.id}/label?print=true`}>
-                Print Label
-              </Link>
+              <Link href={`/inventory/discs/${item.id}/label?print=true`}>Print Label</Link>
             )}
           </td>
         </tr>

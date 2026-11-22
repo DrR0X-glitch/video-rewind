@@ -17,7 +17,9 @@ type ReviewPageProps = {
 export default async function InventoryReviewPage({ searchParams }: ReviewPageProps) {
   const params = await searchParams;
   const selectedPage =
-    typeof params.page === "string" && /^\d+$/.test(params.page) && Number.parseInt(params.page, 10) > 0
+    typeof params.page === "string" &&
+    /^\d+$/.test(params.page) &&
+    Number.parseInt(params.page, 10) > 0
       ? Number.parseInt(params.page, 10)
       : 1;
   const stockPage = await listStockDiscs({
@@ -44,7 +46,9 @@ export default async function InventoryReviewPage({ searchParams }: ReviewPagePr
           <div>
             <h1>Review Queue</h1>
             <p className="muted utility-row">
-              {totalCount === 0 ? "No discs waiting for review" : `Showing ${pageStart}-${pageEnd} of ${totalCount}`}
+              {totalCount === 0
+                ? "No discs waiting for review"
+                : `Showing ${pageStart}-${pageEnd} of ${totalCount}`}
             </p>
           </div>
           <Link href="/inventory/stock">Back to Stock</Link>
@@ -88,7 +92,9 @@ export default async function InventoryReviewPage({ searchParams }: ReviewPagePr
                   ) : (
                     <span className="muted">Previous</span>
                   )}
-                  <span className="muted">Page {currentPage} of {totalPages}</span>
+                  <span className="muted">
+                    Page {currentPage} of {totalPages}
+                  </span>
                   {nextPageHref ? (
                     <Link href={nextPageHref}>Next</Link>
                   ) : (

@@ -15,7 +15,9 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
         <div className="container masthead">
           <div className="site-brand">
             <Link href={isInventory ? "/inventory" : "/"} className="site-title">
-              <span className="site-logo-placeholder" aria-hidden="true">Video Rewind</span>
+              <span className="site-logo-placeholder" aria-hidden="true">
+                Video Rewind
+              </span>
               <span className="sr-only">Video Rewind</span>
             </Link>
           </div>

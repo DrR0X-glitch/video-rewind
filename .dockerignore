@@ -1,6 +1,8 @@
 node_modules
 .next
 .git
+.env*
+backups
 .DS_Store
 pnpm-debug.log
 docker-compose.yml

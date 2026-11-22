@@ -4,11 +4,7 @@ type PosterSwatchProps = {
   size?: "card" | "detail";
 };
 
-export function PosterSwatch({
-  title,
-  color,
-  size = "card",
-}: PosterSwatchProps) {
+export function PosterSwatch({ title, color, size = "card" }: PosterSwatchProps) {
   return (
     <div
       className={`poster-swatch poster-${size}`}

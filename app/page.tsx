@@ -45,12 +45,7 @@ export default async function HomePage() {
           <label htmlFor="home-search" className="sr-only">
             Search the catalogue
           </label>
-          <input
-            id="home-search"
-            type="text"
-            name="q"
-            placeholder="Search the catalogue"
-          />
+          <input id="home-search" type="text" name="q" placeholder="Search the catalogue" />
           <button type="submit">Search</button>
         </form>
       </section>

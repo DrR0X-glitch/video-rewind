@@ -15,9 +15,7 @@ function getString(formData: FormData, key: string) {
 }
 
 function getStringList(formData: FormData, key: string) {
-  return formData
-    .getAll(key)
-    .flatMap((value) => (typeof value === "string" ? [value.trim()] : []));
+  return formData.getAll(key).flatMap((value) => (typeof value === "string" ? [value.trim()] : []));
 }
 
 export async function updateDisc(formData: FormData) {

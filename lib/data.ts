@@ -1,3 +1,5 @@
+import "server-only";
+
 import {
   getAlphabeticalStockSectionsFromDatabase,
   getMovieDetailFromDatabase,
@@ -96,11 +98,7 @@ export async function searchInventoryTitles(
   return listInventoryTitlesFromDatabase(query, limit);
 }
 
-export async function searchInventoryTitlesPage(
-  query?: string,
-  page?: number,
-  pageSize?: number,
-) {
+export async function searchInventoryTitlesPage(query?: string, page?: number, pageSize?: number) {
   return listInventoryTitlesPageFromDatabase(query, page, pageSize);
 }
 

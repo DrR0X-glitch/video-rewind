@@ -15,9 +15,7 @@ type InventoryNewPageProps = {
   }>;
 };
 
-export default async function InventoryNewPage({
-  searchParams,
-}: InventoryNewPageProps) {
+export default async function InventoryNewPage({ searchParams }: InventoryNewPageProps) {
   const params = await searchParams;
   const selectedIds = (params.selected ?? "")
     .split(",")
@@ -25,7 +23,9 @@ export default async function InventoryNewPage({
     .filter(Boolean);
   const selectedMovies = await Promise.all(
     selectedIds.map((id) => getMovieById(id).catch(() => null)),
-  ).then((items) => items.filter((item): item is NonNullable<(typeof items)[number]> => item !== null));
+  ).then((items) =>
+    items.filter((item): item is NonNullable<(typeof items)[number]> => item !== null),
+  );
   const tmdbDraft =
     params.tmdb && params.tmdb.trim()
       ? await getTmdbMovieDraft(params.tmdb).catch(() => null)
@@ -50,7 +50,9 @@ export default async function InventoryNewPage({
     <div className="inventory-layout">
       <section className="panel section">
         <h1>Find or create a title</h1>
-        <p className="muted">Search first. If the title exists, add a copy to it. If not, create it from TMDB.</p>
+        <p className="muted">
+          Search first. If the title exists, add a copy to it. If not, create it from TMDB.
+        </p>
       </section>
 
       <InventoryNewFlow
