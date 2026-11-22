@@ -127,6 +127,29 @@ export default async function InventoryStockPage({ searchParams }: StockPageProp
   });
   const items = stockPage.items;
   const totalCount = stockPage.totalCount;
+  const allMatchingItems =
+    showAll || stockPage.items.length >= stockPage.totalCount
+      ? stockPage.items
+      : (
+          await listStockDiscs({
+            preset: selectedPreset,
+            q: query || undefined,
+            section: section || undefined,
+            row: row || undefined,
+            availability: selectedAvailability,
+            edited: selectedEdited,
+            formats: selectedFormats,
+            primary: selectedPrimary,
+            zones: selectedZones,
+            sealedStates: selectedSealedStates,
+            reviewedState: "true",
+            sort: selectedSort,
+            dir: selectedDir,
+            page: 1,
+            pageSize: 100000,
+          })
+        ).items;
+  const allMatchingIds = allMatchingItems.map((item) => item.id);
   const totalPages = showAll ? 1 : Math.max(1, Math.ceil(totalCount / STOCK_PAGE_SIZE));
   const currentPage = showAll ? 1 : Math.min(selectedPage, totalPages);
   const pageStart = totalCount === 0 ? 0 : (currentPage - 1) * (showAll ? totalCount || 1 : STOCK_PAGE_SIZE) + 1;
@@ -252,15 +275,6 @@ export default async function InventoryStockPage({ searchParams }: StockPageProp
               />
             </label>
             <SingleSelectDropdown
-              label="Availability"
-              name="availability"
-              selectedValue={selectedAvailability}
-              options={availabilityOptions.map((option) => ({
-                value: option.value,
-                label: option.label,
-              }))}
-            />
-            <SingleSelectDropdown
               label="Last Edited"
               name="edited"
               selectedValue={selectedEdited}
@@ -345,7 +359,6 @@ export default async function InventoryStockPage({ searchParams }: StockPageProp
                 <th>{renderSortLink("Format", "format", selectedSort, selectedDir, params)}</th>
                 <th>{renderSortLink("Titles", "order", selectedSort, selectedDir, params)}</th>
                 <th>{renderSortLink("Primary", "primary", selectedSort, selectedDir, params)}</th>
-                <th>{renderSortLink("Availability", "availability", selectedSort, selectedDir, params)}</th>
                 <th>{renderSortLink("Sealed", "sealed", selectedSort, selectedDir, params)}</th>
                 <th>{renderSortLink("Last Edited", "updated", selectedSort, selectedDir, params)}</th>
                 <th>{renderSortLink("Location", "location", selectedSort, selectedDir, params)}</th>
@@ -357,11 +370,12 @@ export default async function InventoryStockPage({ searchParams }: StockPageProp
               bulkFormId={bulkFormId}
               currentStockHref={currentStockHref}
               items={items}
+              showAvailabilityColumn={false}
               showPrimaryColumn
             />
           </table>
             <div className="section stock-table-footer">
-              <StockBulkControls />
+              <StockBulkControls allMatchingIds={allMatchingIds} />
               {totalPages > 1 || showAll ? (
                 <div className="header-actions stock-pagination">
                   {showAll ? (

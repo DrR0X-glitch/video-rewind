@@ -985,7 +985,7 @@ export async function listInventoryTitlesFromDatabase(query?: string, limit?: nu
 export async function listInventoryTitlesPageFromDatabase(
   query?: string,
   page = 1,
-  pageSize = 20,
+  pageSize = 50,
 ) {
   const pageResult = await listMoviesPageFromDatabase({
     search: query?.trim() || undefined,
@@ -2653,8 +2653,9 @@ export async function bulkUpdateInventoryItemsInDatabase(body: Record<string, un
       : typeof body.inventory_ids === "string"
         ? body.inventory_ids.split(",").map((value) => value.trim()).filter(Boolean)
         : [];
+  const uniqueInventoryIds = Array.from(new Set(inventoryIds));
 
-  if (inventoryIds.length === 0) {
+  if (uniqueInventoryIds.length === 0) {
     throw createHttpError(400, 'Field "inventory_ids" must include at least one disc');
   }
 
@@ -2664,7 +2665,7 @@ export async function bulkUpdateInventoryItemsInDatabase(body: Record<string, un
         DELETE FROM inventory_items
         WHERE id = ANY($1::uuid[]);
       `,
-      [inventoryIds],
+      [uniqueInventoryIds],
     );
 
     return { updatedCount: result.rowCount ?? 0 };
@@ -2711,7 +2712,7 @@ export async function bulkUpdateInventoryItemsInDatabase(body: Record<string, un
           updated_at = NOW()
         WHERE id = ANY($1::uuid[]);
       `,
-      [inventoryIds, applyAvailability ? availability : null, applyReviewed ? reviewed : null, zone, section, row],
+      [uniqueInventoryIds, applyAvailability ? availability : null, applyReviewed ? reviewed : null, zone, section, row],
     );
 
     return { updatedCount: result.rowCount ?? 0 };

@@ -1,8 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 
 import { addDiscToExistingTitle, createTitleAndAddToDisc, createTitleOnly } from "@/app/inventory/new/actions";
+import { PosterSwatch } from "@/components/poster-swatch";
 import { ZONE_OPTIONS, formatZoneLabel } from "@/lib/constants";
 import { formatLinkedTitleLabel, formatMediaType, formatMovieTitleWithYear } from "@/lib/format";
 import type { MovieWithInventory } from "@/lib/types";
@@ -10,6 +12,7 @@ import type { TmdbTitleDraft } from "@/lib/server/tmdb";
 
 const DISC_DEFAULTS_STORAGE_KEY = "inventory-new-disc-defaults";
 const LEGACY_DISC_DEFAULTS_STORAGE_KEY = "inventory-new-disc-defaults";
+const SELECTED_TITLE_GRID_LIMIT = 6;
 
 type DiscDraft = {
   availability: boolean;
@@ -26,6 +29,11 @@ type DiscDraft = {
 
 type DiscDefaults = Pick<DiscDraft, "format" | "sealed" | "zone" | "row"> & {
   sectionOverride?: string | null;
+};
+
+type InventoryTitleSearchResponse = {
+  items: MovieWithInventory[];
+  totalCount: number;
 };
 
 type SeasonDraft = {
@@ -194,7 +202,7 @@ export function InventoryNewFlow({
 
       try {
         const response = await fetch(
-          `/api/inventory?search=${encodeURIComponent(trimmedSearch)}&limit=5`,
+          `/api/inventory?search=${encodeURIComponent(trimmedSearch)}&pageSize=5`,
           { signal: abortController.signal },
         );
 
@@ -202,8 +210,8 @@ export function InventoryNewFlow({
           throw new Error("Search failed");
         }
 
-        const data = (await response.json()) as MovieWithInventory[];
-        setMatches(data);
+        const data = (await response.json()) as InventoryTitleSearchResponse;
+        setMatches(data.items);
       } catch (error) {
         if (abortController.signal.aborted) {
           return;
@@ -343,6 +351,54 @@ export function InventoryNewFlow({
     return true;
   }
 
+  function renderSelectedMovie(movie: MovieWithInventory) {
+    const titleLabel = formatLinkedTitleLabel({
+      title: movie.title,
+      releaseDate: movie.releaseDate,
+      mediaType: movie.mediaType,
+      seasonStart: seasonDrafts[movie.id]?.seasonStart
+        ? Number.parseInt(seasonDrafts[movie.id].seasonStart, 10)
+        : undefined,
+      seasonEnd: seasonDrafts[movie.id]?.seasonEnd
+        ? Number.parseInt(seasonDrafts[movie.id].seasonEnd, 10)
+        : undefined,
+      episodeStart: seasonDrafts[movie.id]?.episodeStart
+        ? Number.parseInt(seasonDrafts[movie.id].episodeStart, 10)
+        : undefined,
+      episodeEnd: seasonDrafts[movie.id]?.episodeEnd
+        ? Number.parseInt(seasonDrafts[movie.id].episodeEnd, 10)
+        : undefined,
+    });
+
+    return (
+      <li
+        key={movie.id}
+        className={`selected-title-card${movie.id === selectedMovies[0]?.id ? " selected-title-card-primary" : ""}`}
+      >
+        <div className="selected-title-poster">
+          {movie.posterUrl ? (
+            <Image
+              src={movie.posterUrl}
+              alt={`${movie.title} poster`}
+              fill
+              sizes="(max-width: 420px) 100vw, 50vw"
+              className="poster-image-cover"
+            />
+          ) : (
+            <PosterSwatch title={movie.title} color={movie.posterColor} />
+          )}
+        </div>
+        <div className="selected-title-copy">
+          <strong>{titleLabel}</strong>
+          <span className="muted">{formatMediaType(movie.mediaType)}</span>
+          <button type="button" onClick={() => removeSelectedMovie(movie.id)}>
+            Remove
+          </button>
+        </div>
+      </li>
+    );
+  }
+
   return (
     <>
       <section className="panel section">
@@ -402,38 +458,42 @@ export function InventoryNewFlow({
         <div className="two-column">
           <section className="panel section">
             <h2>2. Titles On Disc</h2>
-            {selectedMovies.length > 1 ? (
-              <p className="muted">
-                The first title added will be treated as the primary title for this disc.
-              </p>
-            ) : null}
-            <ul className="plain-list plain-actions">
-              {selectedMovies.map((movie) => (
-                <li key={movie.id}>
-                  <span>{formatLinkedTitleLabel({
-                    title: movie.title,
-                    releaseDate: movie.releaseDate,
-                    mediaType: movie.mediaType,
-                    seasonStart: seasonDrafts[movie.id]?.seasonStart
-                      ? Number.parseInt(seasonDrafts[movie.id].seasonStart, 10)
-                      : undefined,
-                    seasonEnd: seasonDrafts[movie.id]?.seasonEnd
-                      ? Number.parseInt(seasonDrafts[movie.id].seasonEnd, 10)
-                      : undefined,
-                    episodeStart: seasonDrafts[movie.id]?.episodeStart
-                      ? Number.parseInt(seasonDrafts[movie.id].episodeStart, 10)
-                      : undefined,
-                    episodeEnd: seasonDrafts[movie.id]?.episodeEnd
-                      ? Number.parseInt(seasonDrafts[movie.id].episodeEnd, 10)
-                      : undefined,
-                  })}</span>
-                  <span className="muted">{formatMediaType(movie.mediaType)}</span>
-                  <button type="button" onClick={() => removeSelectedMovie(movie.id)}>
-                    Remove
-                  </button>
-                </li>
-              ))}
-            </ul>
+            {selectedMovies.length <= SELECTED_TITLE_GRID_LIMIT ? (
+              <ul className="selected-title-grid">
+                {selectedMovies.map(renderSelectedMovie)}
+              </ul>
+            ) : (
+              <ul className="plain-list plain-actions">
+                {selectedMovies.map((movie) => (
+                  <li
+                    key={movie.id}
+                    className={movie.id === selectedMovies[0]?.id ? "selected-title-primary" : undefined}
+                  >
+                    <span>{formatLinkedTitleLabel({
+                      title: movie.title,
+                      releaseDate: movie.releaseDate,
+                      mediaType: movie.mediaType,
+                      seasonStart: seasonDrafts[movie.id]?.seasonStart
+                        ? Number.parseInt(seasonDrafts[movie.id].seasonStart, 10)
+                        : undefined,
+                      seasonEnd: seasonDrafts[movie.id]?.seasonEnd
+                        ? Number.parseInt(seasonDrafts[movie.id].seasonEnd, 10)
+                        : undefined,
+                      episodeStart: seasonDrafts[movie.id]?.episodeStart
+                        ? Number.parseInt(seasonDrafts[movie.id].episodeStart, 10)
+                        : undefined,
+                      episodeEnd: seasonDrafts[movie.id]?.episodeEnd
+                        ? Number.parseInt(seasonDrafts[movie.id].episodeEnd, 10)
+                        : undefined,
+                    })}</span>
+                    <span className="muted">{formatMediaType(movie.mediaType)}</span>
+                    <button type="button" onClick={() => removeSelectedMovie(movie.id)}>
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
           <section className="panel section">
             <h2>3. Disc</h2>
@@ -638,7 +698,7 @@ function DiscFields({
           onChange={(event) =>
             {
               const nextValue = event.target.value.toUpperCase().slice(0, 2);
-              setSectionOverride(nextValue.trim() ? nextValue : null);
+              setSectionOverride(nextValue);
             }}
         />
       </label>

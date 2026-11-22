@@ -6,7 +6,7 @@ import { formatMediaType, formatMovieTitleWithYear, getAvailabilityLabel } from 
 
 export const dynamic = "force-dynamic";
 
-const INVENTORY_PAGE_SIZE = 20;
+const INVENTORY_PAGE_SIZE = 50;
 
 type InventoryPageProps = {
   searchParams: Promise<{

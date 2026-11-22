@@ -22,8 +22,8 @@ export default async function InventoryReviewPage({ searchParams }: ReviewPagePr
       : 1;
   const stockPage = await listStockDiscs({
     reviewedState: "false",
-    sort: "primary",
-    dir: "desc",
+    sort: "updated",
+    dir: "asc",
     page: selectedPage,
     pageSize: REVIEW_PAGE_SIZE,
   });

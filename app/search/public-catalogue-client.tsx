@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { MovieCard } from "@/components/movie-card";
 import type { MovieWithInventory } from "@/lib/types";
@@ -44,18 +45,19 @@ export function PublicCatalogueClient({
 }: PublicCatalogueClientProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [query, setQuery] = useState(initialQuery);
   const [genre, setGenre] = useState(initialGenre);
   const [decade, setDecade] = useState(initialDecade);
   const [sort, setSort] = useState(initialSort);
   const [availableOnly, setAvailableOnly] = useState(initialAvailable);
-  const [page, setPage] = useState(initialPage);
   const [debouncedQuery, setDebouncedQuery] = useState(initialQuery);
   const [results, setResults] = useState<MovieWithInventory[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
   const previousFilterKeyRef = useRef("");
+  const currentPage = parsePositiveInteger(searchParams.get("page")) ?? initialPage;
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -69,15 +71,10 @@ export function PublicCatalogueClient({
 
   useEffect(() => {
     const filterKey = [debouncedQuery.trim(), genre, decade, sort, availableOnly ? "1" : "0"].join("|");
-
-    if (previousFilterKeyRef.current && previousFilterKeyRef.current !== filterKey) {
-      setPage(1);
-    }
-
+    const resetPage = previousFilterKeyRef.current !== "" && previousFilterKeyRef.current !== filterKey;
     previousFilterKeyRef.current = filterKey;
-  }, [availableOnly, decade, debouncedQuery, genre, sort]);
 
-  useEffect(() => {
+    const nextPage = resetPage ? 1 : currentPage;
     const params = new URLSearchParams();
 
     if (debouncedQuery.trim()) {
@@ -100,12 +97,12 @@ export function PublicCatalogueClient({
       params.set("available", "true");
     }
 
-    if (page > 1) {
-      params.set("page", page.toString());
+    if (nextPage > 1) {
+      params.set("page", nextPage.toString());
     }
 
     router.replace(params.toString() ? `${pathname}?${params.toString()}` : pathname, { scroll: false });
-  }, [availableOnly, decade, debouncedQuery, genre, page, pathname, router, sort]);
+  }, [availableOnly, currentPage, decade, debouncedQuery, genre, pathname, router, sort]);
 
   useEffect(() => {
     const abortController = new AbortController();
@@ -131,7 +128,7 @@ export function PublicCatalogueClient({
       params.set("available", "true");
     }
 
-    params.set("page", page.toString());
+    params.set("page", currentPage.toString());
     params.set("pageSize", PUBLIC_PAGE_SIZE.toString());
 
     async function runSearch() {
@@ -179,12 +176,20 @@ export function PublicCatalogueClient({
     return () => {
       abortController.abort();
     };
-  }, [availableOnly, decade, debouncedQuery, genre, page, sort]);
+  }, [availableOnly, currentPage, decade, debouncedQuery, genre, sort]);
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PUBLIC_PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
-  const pageStart = totalCount === 0 ? 0 : (currentPage - 1) * PUBLIC_PAGE_SIZE + 1;
+  const currentPageOnResultSet = Math.min(currentPage, totalPages);
+  const pageStart = totalCount === 0 ? 0 : (currentPageOnResultSet - 1) * PUBLIC_PAGE_SIZE + 1;
   const pageEnd = totalCount === 0 ? 0 : pageStart + results.length - 1;
+  const previousPageHref =
+    currentPageOnResultSet > 1
+      ? buildCatalogueHref(pathname, debouncedQuery, genre, decade, sort, availableOnly, currentPageOnResultSet - 1)
+      : null;
+  const nextPageHref =
+    currentPageOnResultSet < totalPages
+      ? buildCatalogueHref(pathname, debouncedQuery, genre, decade, sort, availableOnly, currentPageOnResultSet + 1)
+      : null;
 
   return (
     <div className="search-catalogue">
@@ -201,7 +206,6 @@ export function PublicCatalogueClient({
             value={query}
             onChange={(event) => {
               setQuery(event.target.value);
-              setPage(1);
             }}
             placeholder="Search title, cast, genre, director, or description"
             autoComplete="off"
@@ -217,7 +221,6 @@ export function PublicCatalogueClient({
               value={genre}
               onChange={(event) => {
                 setGenre(event.target.value);
-                setPage(1);
               }}
             >
               <option value="all">All genres</option>
@@ -234,7 +237,6 @@ export function PublicCatalogueClient({
               value={decade}
               onChange={(event) => {
                 setDecade(event.target.value);
-                setPage(1);
               }}
             >
               <option value="all">All decades</option>
@@ -251,7 +253,6 @@ export function PublicCatalogueClient({
               value={sort}
               onChange={(event) => {
                 setSort(event.target.value);
-                setPage(1);
               }}
             >
               {sortOptions.map((option) => (
@@ -267,7 +268,6 @@ export function PublicCatalogueClient({
               checked={availableOnly}
               onChange={(event) => {
                 setAvailableOnly(event.target.checked);
-                setPage(1);
               }}
             />
             <span>Available only</span>
@@ -297,26 +297,72 @@ export function PublicCatalogueClient({
             <MovieCard key={movie.id} movie={movie} />
           ))}
         </div>
-        {totalCount > PUBLIC_PAGE_SIZE || page > 1 ? (
+        {totalCount > PUBLIC_PAGE_SIZE || currentPageOnResultSet > 1 ? (
           <div className="section stock-table-footer">
-            <p className="muted utility-row">
-              Page {currentPage} of {totalPages}
-            </p>
             <div className="header-actions stock-pagination">
-              <button type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={currentPage <= 1}>
-                Previous
-              </button>
-              <button
-                type="button"
-                onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
-                disabled={currentPage >= totalPages}
-              >
-                Next
-              </button>
+              {previousPageHref ? (
+                <Link href={previousPageHref}>Previous</Link>
+              ) : (
+                <span className="muted">Previous</span>
+              )}
+              <span className="muted">Page {currentPageOnResultSet} of {totalPages}</span>
+              {nextPageHref ? (
+                <Link href={nextPageHref}>Next</Link>
+              ) : (
+                <span className="muted">Next</span>
+              )}
             </div>
           </div>
         ) : null}
       </section>
     </div>
   );
+}
+
+function parsePositiveInteger(value: string | null) {
+  if (!value || !/^\d+$/.test(value)) {
+    return null;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  return parsed > 0 ? parsed : null;
+}
+
+function buildCatalogueHref(
+  pathname: string,
+  query: string,
+  genre: string,
+  decade: string,
+  sort: string,
+  availableOnly: boolean,
+  page: number,
+) {
+  const params = new URLSearchParams();
+
+  if (query.trim()) {
+    params.set("q", query.trim());
+  }
+
+  if (genre !== "all") {
+    params.set("genre", genre);
+  }
+
+  if (decade !== "all") {
+    params.set("decade", decade);
+  }
+
+  if (sort !== "title") {
+    params.set("sort", sort);
+  }
+
+  if (availableOnly) {
+    params.set("available", "true");
+  }
+
+  if (page > 1) {
+    params.set("page", page.toString());
+  }
+
+  const queryString = params.toString();
+  return queryString ? `${pathname}?${queryString}` : pathname;
 }

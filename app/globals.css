@@ -322,6 +322,7 @@ h2 {
   text-decoration: underline;
   cursor: pointer;
   font: inherit;
+  width: fit-content;
 }
 
 .link-button:hover {
@@ -803,6 +804,12 @@ h2 {
   gap: 0.5rem;
 }
 
+.form-label-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
 .inline-split {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1106,6 +1113,54 @@ th {
   background: var(--panel);
 }
 
+.selected-title-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.selected-title-card {
+  min-width: 0;
+  border: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.selected-title-card-primary,
+.selected-title-primary {
+  border-width: 2px;
+  border-color: var(--brand-soft);
+}
+
+.selected-title-poster {
+  position: relative;
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border);
+}
+
+.selected-title-poster .poster-swatch {
+  height: 100%;
+}
+
+.selected-title-copy {
+  display: grid;
+  align-content: start;
+  gap: 0.25rem;
+  padding: 0.6rem;
+}
+
+.selected-title-copy strong {
+  overflow-wrap: anywhere;
+}
+
+.selected-title-copy button {
+  justify-self: start;
+  margin-top: 0.25rem;
+}
+
 .search-results {
   margin-top: 0.75rem;
 }
@@ -1224,6 +1279,10 @@ th {
 
   .plain-actions li {
     grid-template-columns: 1fr;
+  }
+
+  .selected-title-grid {
+    gap: 0.6rem;
   }
 
   .movie-rail-controls {

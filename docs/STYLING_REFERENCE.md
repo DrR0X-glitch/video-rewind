@@ -125,6 +125,9 @@ Movie cards:
 .movie-meta { font-size: 12px; color: var(--muted); }
 ```
 
+Small selected-title sets may use a two-column poster grid with metadata and actions below each poster; larger sets should use a compact list.
+When order determines a primary item, use a subtle border to distinguish the first item without adding a label.
+
 Availability should stay text-first and not rely on colour alone.
 
 Examples:
@@ -154,6 +157,7 @@ Button-style radio groups are appropriate for short constrained choices such as 
 Single boolean flags such as sealed should prefer a checkbox-style control.
 Checkbox-style format filters are appropriate for stock views where multiple formats can be active at once.
 Link-style button actions are acceptable when a form action needs to visually match surrounding links.
+Inline label actions should use a small gap and text-sized hit areas.
 
 Inputs:
 

@@ -37,8 +37,6 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
               <>
                 <Link href="/">Browse</Link>
                 <Link href="/search">Search</Link>
-                <Link href="/about">About</Link>
-                <Link href="/contact">Contact</Link>
               </>
             )}
           </nav>

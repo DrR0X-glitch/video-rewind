@@ -4,13 +4,18 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { ZONE_OPTIONS, formatZoneLabel } from "@/lib/constants";
 
-export function StockBulkControls() {
+type StockBulkControlsProps = {
+  allMatchingIds: string[];
+};
+
+export function StockBulkControls({ allMatchingIds }: StockBulkControlsProps) {
   const dialogRef = useRef<HTMLDialogElement | null>(null);
   const [applyAvailability, setApplyAvailability] = useState(false);
+  const [applyReviewed, setApplyReviewed] = useState(false);
   const [applyZone, setApplyZone] = useState(false);
   const [applySection, setApplySection] = useState(false);
   const [applyRow, setApplyRow] = useState(false);
-  const [selectedCount, setSelectedCount] = useState(0);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const isMounted = useSyncExternalStore(
     () => () => {},
     () => true,
@@ -19,8 +24,12 @@ export function StockBulkControls() {
 
   useEffect(() => {
     function handleSelectionChange(event: Event) {
-      const detail = (event as CustomEvent<{ count?: number }>).detail;
-      setSelectedCount(typeof detail?.count === "number" ? detail.count : 0);
+      const detail = (event as CustomEvent<{ ids?: string[] }>).detail;
+      setSelectedIds(
+        Array.isArray(detail?.ids)
+          ? detail.ids.filter((value): value is string => typeof value === "string" && value.trim() !== "")
+          : [],
+      );
     }
 
     window.addEventListener("stock-selection-change", handleSelectionChange);
@@ -42,16 +51,30 @@ export function StockBulkControls() {
     window.dispatchEvent(new CustomEvent("stock-clear-selection"));
   }
 
+  function selectAllFiltered() {
+    window.dispatchEvent(
+      new CustomEvent("stock-set-selection", {
+        detail: { ids: allMatchingIds },
+      }),
+    );
+  }
+
   return (
     <div className="stock-bulk-controls">
       <div className="bulk-toolbar">
         <button type="button" onClick={openDialog}>Bulk Edit</button>
+        <button type="button" onClick={selectAllFiltered} disabled={allMatchingIds.length === 0}>
+          Select All Filtered
+        </button>
         <button type="button" onClick={clearSelection}>Clear Selected</button>
         <button type="submit" name="action" value="delete">Delete Selected</button>
       </div>
       <p className="muted stock-selected-count">
-        {selectedCount} selected
+        {selectedIds.length} selected
       </p>
+      {selectedIds.map((inventoryId) => (
+        <input key={inventoryId} type="hidden" name="inventoryIds" value={inventoryId} />
+      ))}
 
       {isMounted ? (
         <dialog ref={dialogRef} className="bulk-edit-dialog">
@@ -82,6 +105,24 @@ export function StockBulkControls() {
                 <select name="availability" defaultValue="true" disabled={!applyAvailability}>
                   <option value="true">Available</option>
                   <option value="false">Out</option>
+                </select>
+              </label>
+
+              <label className="checkbox-row">
+                <input
+                  type="checkbox"
+                  name="applyReviewed"
+                  value="true"
+                  checked={applyReviewed}
+                  onChange={(event) => setApplyReviewed(event.target.checked)}
+                />
+                <span>Change reviewed</span>
+              </label>
+              <label>
+                Reviewed
+                <select name="reviewed" defaultValue="true" disabled={!applyReviewed}>
+                  <option value="true">Reviewed</option>
+                  <option value="false">Needs review</option>
                 </select>
               </label>
 

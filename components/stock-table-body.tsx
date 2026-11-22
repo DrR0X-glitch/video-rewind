@@ -44,20 +44,30 @@ export function StockTableBody({
   useEffect(() => {
     window.dispatchEvent(
       new CustomEvent("stock-selection-change", {
-        detail: { count: selectedIds.size },
+        detail: { count: selectedIds.size, ids: Array.from(selectedIds) },
       }),
     );
   }, [selectedIds]);
 
   useEffect(() => {
+    function handleSetSelection(event: Event) {
+      const detail = (event as CustomEvent<{ ids?: string[] }>).detail;
+      const ids = Array.isArray(detail?.ids) ? detail.ids.filter((value): value is string => typeof value === "string" && value.trim() !== "") : [];
+
+      setSelectedIds(new Set(ids));
+      lastSelectedIndexRef.current = null;
+    }
+
     function handleClearSelection() {
       setSelectedIds(new Set());
       lastSelectedIndexRef.current = null;
     }
 
+    window.addEventListener("stock-set-selection", handleSetSelection);
     window.addEventListener("stock-clear-selection", handleClearSelection);
 
     return () => {
+      window.removeEventListener("stock-set-selection", handleSetSelection);
       window.removeEventListener("stock-clear-selection", handleClearSelection);
     };
   }, []);
