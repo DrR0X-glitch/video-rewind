@@ -9,8 +9,9 @@ import {
   createTitleOnly,
 } from "@/app/inventory/new/actions";
 import { PosterSwatch } from "@/components/poster-swatch";
-import { ZONE_OPTIONS, formatZoneLabel } from "@/lib/constants";
+import { formatZoneLabel } from "@/lib/constants";
 import { formatLinkedTitleLabel, formatMediaType, formatMovieTitleWithYear } from "@/lib/format";
+import type { InventoryZone } from "@/lib/inventory-zones";
 import type { MovieWithInventory } from "@/lib/types";
 import type { TmdbTitleDraft } from "@/lib/server/tmdb";
 
@@ -62,6 +63,8 @@ const DEFAULT_DISC_DRAFT: DiscDraft = {
 
 type InventoryNewFlowProps = {
   initialSelectedMovies: MovieWithInventory[];
+  zones: InventoryZone[];
+  defaultZone: string;
   duplicateMovie: MovieWithInventory | null;
   suggestedSortTitle: string;
   title: string;
@@ -71,6 +74,8 @@ type InventoryNewFlowProps = {
 
 export function InventoryNewFlow({
   initialSelectedMovies,
+  zones,
+  defaultZone,
   duplicateMovie,
   suggestedSortTitle,
   title,
@@ -80,7 +85,10 @@ export function InventoryNewFlow({
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedMovies, setSelectedMovies] = useState(initialSelectedMovies);
-  const [discDraft, setDiscDraft] = useState<DiscDraft>(DEFAULT_DISC_DRAFT);
+  const [discDraft, setDiscDraft] = useState<DiscDraft>({
+    ...DEFAULT_DISC_DRAFT,
+    zone: defaultZone,
+  });
   const [hasLoadedDraft, setHasLoadedDraft] = useState(false);
   const [matches, setMatches] = useState<MovieWithInventory[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -104,7 +112,7 @@ export function InventoryNewFlow({
           window.sessionStorage.getItem(LEGACY_DISC_DEFAULTS_STORAGE_KEY);
 
         if (!savedDefaults) {
-          setDiscDraft(DEFAULT_DISC_DRAFT);
+          setDiscDraft({ ...DEFAULT_DISC_DRAFT, zone: defaultZone });
           setSectionOverride(null);
           return;
         }
@@ -128,9 +136,10 @@ export function InventoryNewFlow({
                   ? false
                   : DEFAULT_DISC_DRAFT.sealed,
           zone:
-            typeof parsedDefaults.zone === "string" && parsedDefaults.zone
+            typeof parsedDefaults.zone === "string" &&
+            zones.some((zone) => zone.code === parsedDefaults.zone)
               ? parsedDefaults.zone
-              : DEFAULT_DISC_DRAFT.zone,
+              : defaultZone,
           row: typeof parsedDefaults.row === "string" ? parsedDefaults.row : DEFAULT_DISC_DRAFT.row,
           dayPrice: DEFAULT_DISC_DRAFT.dayPrice,
           weekendPrice: DEFAULT_DISC_DRAFT.weekendPrice,
@@ -145,7 +154,7 @@ export function InventoryNewFlow({
             : null,
         );
       } catch {
-        setDiscDraft(DEFAULT_DISC_DRAFT);
+        setDiscDraft({ ...DEFAULT_DISC_DRAFT, zone: defaultZone });
         setSectionOverride(null);
       } finally {
         setHasLoadedDraft(true);
@@ -155,7 +164,7 @@ export function InventoryNewFlow({
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [defaultSectionFromTitle]);
+  }, [defaultSectionFromTitle, defaultZone, zones]);
 
   useEffect(() => {
     if (!hasLoadedDraft) {
@@ -532,6 +541,7 @@ export function InventoryNewFlow({
               <DiscFields
                 defaultSectionFromTitle={defaultSectionFromTitle}
                 discDraft={discDraft}
+                zones={zones}
                 onAutofillSection={autofillSection}
                 seasonDrafts={seasonDrafts}
                 selectedMovies={selectedMovies}
@@ -632,6 +642,7 @@ export function InventoryNewFlow({
 function DiscFields({
   defaultSectionFromTitle,
   discDraft,
+  zones,
   onAutofillSection,
   seasonDrafts,
   selectedMovies,
@@ -642,6 +653,7 @@ function DiscFields({
 }: {
   defaultSectionFromTitle: string;
   discDraft: DiscDraft;
+  zones: InventoryZone[];
   onAutofillSection: () => void;
   seasonDrafts: Record<string, SeasonDraft>;
   selectedMovies: MovieWithInventory[];
@@ -694,16 +706,18 @@ function DiscFields({
       <label>
         Zone
         <span className="button-choice-group">
-          {ZONE_OPTIONS.map((zone) => (
-            <label key={zone} className="choice-button">
+          {zones.map((zone) => (
+            <label key={zone.code} className="choice-button">
               <input
                 type="radio"
                 name="zone"
-                value={zone}
-                checked={discDraft.zone === zone}
-                onChange={() => setDiscDraft((currentDraft) => ({ ...currentDraft, zone }))}
+                value={zone.code}
+                checked={discDraft.zone === zone.code}
+                onChange={() =>
+                  setDiscDraft((currentDraft) => ({ ...currentDraft, zone: zone.code }))
+                }
               />
-              <span>{formatZoneLabel(zone)}</span>
+              <span>{formatZoneLabel(zone.code, zones)}</span>
             </label>
           ))}
         </span>

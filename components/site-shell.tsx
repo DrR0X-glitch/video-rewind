@@ -34,6 +34,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                 <Link href="/inventory/stock">Stock</Link>
                 <Link href="/inventory/review">Review</Link>
                 <Link href="/inventory/new">New</Link>
+                <Link href="/inventory/settings">Settings</Link>
               </>
             ) : (
               <>

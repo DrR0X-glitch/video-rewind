@@ -3,9 +3,10 @@ import Link from "next/link";
 import { applyBulkStockAction } from "@/app/inventory/stock/actions";
 import { StockBulkControls } from "@/components/stock-bulk-controls";
 import { StockTableBody } from "@/components/stock-table-body";
-import { FORMAT_OPTIONS, ZONE_OPTIONS, formatZoneLabel } from "@/lib/constants";
+import { FORMAT_OPTIONS } from "@/lib/constants";
 import { listStockDiscs } from "@/lib/data";
 import { formatDiscFormat } from "@/lib/format";
+import { listInventoryZones } from "@/lib/server/inventory/zones";
 
 type StockPageProps = {
   searchParams: Promise<{
@@ -27,12 +28,8 @@ type StockPageProps = {
 };
 
 const STOCK_PAGE_SIZE = 50;
+type StockPresetId = "all" | "wall";
 export const dynamic = "force-dynamic";
-
-const presetOptions = [
-  { id: "all", label: "All Discs" },
-  { id: "wall", label: "Wall" },
-] as const;
 
 const availabilityOptions = [
   { value: "all", label: "All discs" },
@@ -73,8 +70,15 @@ const sortOptions = new Set([
 
 export default async function InventoryStockPage({ searchParams }: StockPageProps) {
   const params = await searchParams;
+  const zones = await listInventoryZones();
+  const zoneCodes = zones.map((zone) => zone.code);
+  const activeZones = zones.filter((zone) => zone.isActive);
+  const presetOptions = [
+    { id: "all", label: "All Discs" },
+    { id: "wall", label: zones.find((zone) => zone.code === "W")?.label ?? "Wall" },
+  ] as const;
   const selectedFormats = getSelectedValues(params.format, FORMAT_OPTIONS);
-  const selectedZones = getSelectedValues(params.zone, ZONE_OPTIONS);
+  const selectedZones = getSelectedValues(params.zone, zoneCodes);
   const selectedSealedStates = getSelectedValues(params.sealed, ["true", "false"] as const);
   const selectedPreset = presetOptions.some((option) => option.id === params.preset)
     ? (params.preset ?? "all")
@@ -318,9 +322,9 @@ export default async function InventoryStockPage({ searchParams }: StockPageProp
               label="Zone"
               name="zone"
               selectedValues={selectedZones}
-              options={ZONE_OPTIONS.map((zone) => ({
-                value: zone,
-                label: formatZoneLabel(zone),
+              options={zones.map((zone) => ({
+                value: zone.code,
+                label: `${zone.label}${zone.isActive ? "" : " (inactive)"}`,
               }))}
             />
             <SingleSelectDropdown
@@ -368,16 +372,68 @@ export default async function InventoryStockPage({ searchParams }: StockPageProp
               <thead>
                 <tr>
                   <th className="selection-column">Select</th>
-                  <th>{renderSortLink("Disc", "disc", selectedSort, selectedDir, params)}</th>
-                  <th>{renderSortLink("Format", "format", selectedSort, selectedDir, params)}</th>
-                  <th>{renderSortLink("Titles", "order", selectedSort, selectedDir, params)}</th>
-                  <th>{renderSortLink("Primary", "primary", selectedSort, selectedDir, params)}</th>
-                  <th>{renderSortLink("Sealed", "sealed", selectedSort, selectedDir, params)}</th>
                   <th>
-                    {renderSortLink("Last Edited", "updated", selectedSort, selectedDir, params)}
+                    {renderSortLink("Disc", "disc", selectedSort, selectedDir, params, zoneCodes)}
                   </th>
                   <th>
-                    {renderSortLink("Location", "location", selectedSort, selectedDir, params)}
+                    {renderSortLink(
+                      "Format",
+                      "format",
+                      selectedSort,
+                      selectedDir,
+                      params,
+                      zoneCodes,
+                    )}
+                  </th>
+                  <th>
+                    {renderSortLink(
+                      "Titles",
+                      "order",
+                      selectedSort,
+                      selectedDir,
+                      params,
+                      zoneCodes,
+                    )}
+                  </th>
+                  <th>
+                    {renderSortLink(
+                      "Primary",
+                      "primary",
+                      selectedSort,
+                      selectedDir,
+                      params,
+                      zoneCodes,
+                    )}
+                  </th>
+                  <th>
+                    {renderSortLink(
+                      "Sealed",
+                      "sealed",
+                      selectedSort,
+                      selectedDir,
+                      params,
+                      zoneCodes,
+                    )}
+                  </th>
+                  <th>
+                    {renderSortLink(
+                      "Last Edited",
+                      "updated",
+                      selectedSort,
+                      selectedDir,
+                      params,
+                      zoneCodes,
+                    )}
+                  </th>
+                  <th>
+                    {renderSortLink(
+                      "Location",
+                      "location",
+                      selectedSort,
+                      selectedDir,
+                      params,
+                      zoneCodes,
+                    )}
                   </th>
                   <th>Notes</th>
                   <th></th>
@@ -392,7 +448,7 @@ export default async function InventoryStockPage({ searchParams }: StockPageProp
               />
             </table>
             <div className="section stock-table-footer">
-              <StockBulkControls allMatchingIds={allMatchingIds} />
+              <StockBulkControls allMatchingIds={allMatchingIds} zones={activeZones} />
               {totalPages > 1 || showAll ? (
                 <div className="header-actions stock-pagination">
                   {showAll ? (
@@ -468,6 +524,7 @@ function renderSortLink(
   selectedSort: string,
   selectedDir: string,
   params: Awaited<StockPageProps["searchParams"]>,
+  zoneCodes: readonly string[],
 ) {
   const nextDir = selectedSort === column && selectedDir === "asc" ? "desc" : "asc";
   const href = buildStockHref({
@@ -487,7 +544,7 @@ function renderSortLink(
     section: normalizeLocationFilter(params.section),
     row: normalizeLocationFilter(params.row),
     sort: column,
-    zones: getSelectedValues(params.zone, ZONE_OPTIONS),
+    zones: getSelectedValues(params.zone, zoneCodes),
   });
 
   return (
@@ -636,7 +693,7 @@ function SingleSelectDropdown({
 }
 
 function applyPresetToFilters(
-  preset: (typeof presetOptions)[number]["id"],
+  preset: StockPresetId,
   current: {
     availability: string;
     edited: string;

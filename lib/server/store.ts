@@ -1,8 +1,10 @@
 import "server-only";
 
-import { ZONE_OPTIONS, formatZoneLabel } from "@/lib/constants";
+import { formatZoneLabel } from "@/lib/constants";
+import { parseInventoryZoneIdentifier } from "@/lib/inventory-zones";
 import { pool } from "@/lib/server/db";
 import { fetchOmdbTitleMetadataByImdbId } from "@/lib/server/omdb";
+import { assertInventoryZoneIsAssignable } from "@/lib/server/inventory/zones";
 import {
   createHttpError,
   formatDateOnly,
@@ -128,6 +130,7 @@ type InventoryItemRow = {
   availability: boolean;
   reviewed: boolean;
   zone: string;
+  zone_label: string | null;
   section: string;
   row: string;
   location_code: string;
@@ -227,15 +230,14 @@ function normalizeZone(value: unknown) {
           ? "W"
           : raw.toUpperCase();
 
+  const parsed = parseInventoryZoneIdentifier(normalized);
   if (!normalized) {
     throw createHttpError(400, 'Field "zone" is required');
   }
-
-  if (!ZONE_OPTIONS.includes(normalized as (typeof ZONE_OPTIONS)[number])) {
+  if (!parsed) {
     throw createHttpError(400, 'Field "zone" is invalid');
   }
-
-  return normalized;
+  return parsed;
 }
 
 function normalizeLocationPart(value: unknown, fieldName: "section" | "row") {
@@ -304,6 +306,7 @@ function toUiInventoryItem(item: InventoryItemRow): InventoryItem {
     availability: item.availability,
     reviewed: item.reviewed,
     zone: item.zone,
+    zoneLabel: item.zone_label ?? formatZoneLabel(item.zone),
     section: item.section,
     row: item.row,
     locationCode: item.location_code,
@@ -567,6 +570,7 @@ async function getInventoryItemsForTitle(titleId: string, options?: { reviewedOn
         i.availability,
         i.reviewed,
         i.zone::text,
+        (SELECT z.label FROM inventory_zones z WHERE z.code = i.zone) AS zone_label,
         i.section,
         i.row,
         i.notes,
@@ -695,6 +699,7 @@ export async function getInventoryItemById(id: string) {
         i.availability,
         i.reviewed,
         i.zone::text,
+        (SELECT z.label FROM inventory_zones z WHERE z.code = i.zone) AS zone_label,
         i.section,
         i.row,
         i.notes,
@@ -1637,6 +1642,7 @@ export async function getAlphabeticalStockSectionsFromDatabase(input: {
         i.sealed,
         i.availability,
         i.zone::text,
+        (SELECT z.label FROM inventory_zones z WHERE z.code = i.zone) AS zone_label,
         i.section,
         i.row,
         i.notes,
@@ -1725,7 +1731,7 @@ export async function getAlphabeticalStockSectionsFromDatabase(input: {
       const [zone, ...sectionParts] = groupKey.split(":");
 
       return {
-        section: `${formatZoneLabel(zone)} / ${sectionParts.join(":")}`,
+        section: `${items[0]?.zoneLabel ?? formatZoneLabel(zone)} / ${sectionParts.join(":")}`,
         items,
       };
     });
@@ -2017,6 +2023,7 @@ export async function listStockDiscsFromDatabase(input: {
         COALESCE(primary_info.is_primary, FALSE) AS is_primary,
         ${searchRankSql}::numeric AS search_rank,
         i.zone::text,
+        (SELECT z.label FROM inventory_zones z WHERE z.code = i.zone) AS zone_label,
         i.section,
         i.row,
         i.notes,
@@ -2134,6 +2141,7 @@ export async function createInventoryItemInDatabase(body: Record<string, unknown
         ? normalizeSealed(body.condition, "condition")
         : false;
   const zone = normalizeZone(body.zone);
+  await assertInventoryZoneIsAssignable(zone);
   const section = normalizeLocationPart(body.section, "section");
   const row = normalizeRowPart(body.row);
   const locationCode = buildLocationCode(zone, section, row);
@@ -2511,6 +2519,10 @@ export async function updateInventoryItemInDatabase(id: string, body: Record<str
     lateClass: body.late_class === undefined ? null : normalizeLateClass(body.late_class),
   };
 
+  if (updateValues.zone !== null) {
+    await assertInventoryZoneIsAssignable(updateValues.zone, id);
+  }
+
   if (Object.values(updateValues).every((value) => value === null) && titleLinks === null) {
     throw createHttpError(400, "Request body must include at least one updatable field");
   }
@@ -2671,6 +2683,9 @@ export async function bulkUpdateInventoryItemsInDatabase(body: Record<string, un
   const zone = applyZone ? normalizeZone(body.zone) : null;
   const section = applySection ? normalizeLocationPart(body.section, "section") : null;
   const row = applyRow ? normalizeRowPart(body.row) : null;
+  if (zone !== null) {
+    await assertInventoryZoneIsAssignable(zone);
+  }
   const inventoryIds = Array.isArray(body.inventory_ids)
     ? body.inventory_ids.filter(
         (value): value is string => typeof value === "string" && value.trim() !== "",

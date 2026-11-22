@@ -1,9 +1,14 @@
-export const ZONE_OPTIONS = ["S", "D", "W"] as const;
 export const FORMAT_OPTIONS = ["dvd", "blu-ray", "4k-uhd"] as const;
 
-export type ZoneOption = (typeof ZONE_OPTIONS)[number];
+export function formatZoneLabel(
+  zone: string,
+  zones?: ReadonlyArray<{ code: string; label: string }>,
+) {
+  const configuredLabel = zones?.find((option) => option.code === zone)?.label;
+  if (configuredLabel) {
+    return configuredLabel;
+  }
 
-export function formatZoneLabel(zone: string) {
   switch (zone) {
     case "S":
     case "shed":

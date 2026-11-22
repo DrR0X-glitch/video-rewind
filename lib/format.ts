@@ -126,7 +126,7 @@ export function getSealedTone(sealed: InventoryItem["sealed"]): "warn" | "muted"
 }
 
 export function formatInventoryLocation(item: InventoryItem): string {
-  return `${formatZoneLabel(item.zone)} / ${item.section}${item.row}`;
+  return `${item.zoneLabel ?? formatZoneLabel(item.zone)} / ${item.section}${item.row}`;
 }
 
 export function formatInventoryIdentifier(item: InventoryItem): string {
