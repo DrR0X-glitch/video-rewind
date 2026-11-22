@@ -43,16 +43,13 @@ function getOmdbApiKey() {
 
 async function fetchTmdbImdbId(tmdbId, mediaType, token) {
   const tmdbPath = mediaType === "series" ? "tv" : "movie";
-  const response = await fetch(
-    `https://api.themoviedb.org/3/${tmdbPath}/${tmdbId}/external_ids`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-      },
-      cache: "no-store",
+  const response = await fetch(`https://api.themoviedb.org/3/${tmdbPath}/${tmdbId}/external_ids`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
     },
-  );
+    cache: "no-store",
+  });
 
   if (!response.ok) {
     return "";
@@ -77,7 +74,11 @@ async function fetchOmdbRating(imdbId, apiKey) {
   }
 
   const payload = await response.json();
-  if (payload.Response !== "True" || typeof payload.imdbRating !== "string" || payload.imdbRating === "N/A") {
+  if (
+    payload.Response !== "True" ||
+    typeof payload.imdbRating !== "string" ||
+    payload.imdbRating === "N/A"
+  ) {
     return null;
   }
 
@@ -166,7 +167,9 @@ async function main() {
           filledImdbRating += 1;
         }
 
-        console.log(`  Updated imdb_id=${imdbIdToStore || "unchanged"} | imdb_rating=${imdbRatingToStore ?? "unchanged"}`);
+        console.log(
+          `  Updated imdb_id=${imdbIdToStore || "unchanged"} | imdb_rating=${imdbRatingToStore ?? "unchanged"}`,
+        );
       } else {
         skipped += 1;
         if (verbose) {

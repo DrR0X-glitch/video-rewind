@@ -4,18 +4,20 @@ Live register of work currently in progress or waiting in the backlog. Remove co
 
 ## In progress
 
-| ID | Task | Notes |
-| --- | --- | --- |
-| DVD-004 | Establish testing and formatting workflows | Add a proper automated test suite and formatter, and assess whether lint/build checks should be extended. |
+| ID      | Task                          | Notes                                                                                                             |
+| ------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| DVD-005 | Plan next-version feature set | Roadmap and modular-monolith decision drafted; next planning pass should refine scope and add timeline estimates. |
 
 ## Backlog
 
-| ID | Task | Notes |
-| --- | --- | --- |
-| — | — | — |
+| ID      | Task                        | Notes                                                                                                                                    |
+| ------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| DVD-007 | Expand domain test coverage | Add focused server, database, and browser tests as each product domain is implemented or substantially changed.                          |
+| DVD-008 | Prepare deployment cutover  | Keep deployment on hold until the roadmap is complete and staff authentication is ready; rehearse migration and recovery before cutover. |
 
 ## Register rules
 
 - Update this register before every commit that includes related work.
 - Remove a task when the commit completes it.
 - Add testing, follow-up, and newly discovered bugs as separate current tasks.
+- Include domain-aligned extraction of touched `lib/server/store.ts` behavior in each feature task; avoid a separate whole-file rewrite.

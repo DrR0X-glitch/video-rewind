@@ -27,4 +27,4 @@ COPY --from=builder /app/db ./db
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "node scripts/init-db.mjs && if [ \"$SEED_DEV_DB\" = \"true\" ]; then node scripts/seed-dev-db.mjs; fi && node server.js"]
+CMD ["node", "server.js"]

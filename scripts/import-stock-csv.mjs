@@ -256,7 +256,8 @@ async function fetchTmdbTitleDraft(tmdbUrl, token) {
 
   return {
     tmdbId: String(payload.id),
-    imdbId: typeof payload.external_ids?.imdb_id === "string" ? payload.external_ids.imdb_id.trim() : "",
+    imdbId:
+      typeof payload.external_ids?.imdb_id === "string" ? payload.external_ids.imdb_id.trim() : "",
     mediaType: parsed.mediaType,
     title: normalizedTitle,
     sortTitle: getSuggestedSortTitle(normalizedTitle),
@@ -279,8 +280,10 @@ async function fetchTmdbTitleDraft(tmdbUrl, token) {
           ? (payload.created_by.find((entry) => typeof entry?.name === "string")?.name ?? "").trim()
           : ""
         : Array.isArray(payload.credits?.crew)
-          ? (payload.credits.crew.find((entry) => entry?.job === "Director" && typeof entry?.name === "string")
-              ?.name ?? ""
+          ? (
+              payload.credits.crew.find(
+                (entry) => entry?.job === "Director" && typeof entry?.name === "string",
+              )?.name ?? ""
             ).trim()
           : "",
     cast: Array.isArray(payload.credits?.cast)
@@ -449,7 +452,16 @@ async function createInventoryItem(client, input) {
       )
       RETURNING id, inventory_code
     `,
-    [inventoryCode, input.sealed, input.format, input.zone, input.section, row, locationCode, input.notes],
+    [
+      inventoryCode,
+      input.sealed,
+      input.format,
+      input.zone,
+      input.section,
+      row,
+      locationCode,
+      input.notes,
+    ],
   );
 
   const inventoryItemId = inventoryResult.rows[0].id;
@@ -525,7 +537,9 @@ async function main() {
 
       if (!tmdbUrl) {
         if (verbose) {
-          console.log(`[${index + 1}/${dataRows.length}] Skipped blank TMDB URL on line ${lineNumber}`);
+          console.log(
+            `[${index + 1}/${dataRows.length}] Skipped blank TMDB URL on line ${lineNumber}`,
+          );
         }
         continue;
       }
@@ -579,7 +593,9 @@ async function main() {
         await client.query("COMMIT");
       } catch (error) {
         await client.query("ROLLBACK");
-        throw new Error(`Import failed on CSV line ${lineNumber}: ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error(
+          `Import failed on CSV line ${lineNumber}: ${error instanceof Error ? error.message : String(error)}`,
+        );
       } finally {
         client.release();
       }

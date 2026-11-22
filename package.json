@@ -7,12 +7,25 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:init": "node --env-file=.env.local scripts/init-db.mjs",
+    "test": "pnpm test:server && pnpm test:browser",
+    "test:server": "vitest run --config vitest.config.mts",
+    "test:browser": "vitest run --config vitest.browser.config.mts",
+    "test:database": "node --env-file=.env.local node_modules/vitest/vitest.mjs run --config vitest.database.config.mts",
+    "test:watch": "pnpm test:watch:server",
+    "test:watch:server": "vitest --config vitest.config.mts",
+    "test:watch:browser": "vitest --config vitest.browser.config.mts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit",
+    "db:migrate": "node --env-file=.env.local scripts/migrate-db.mjs",
+    "db:migrate:baseline": "node --env-file=.env.local scripts/migrate-db.mjs --baseline",
+    "db:migrate:dev-reset": "node --env-file=.env.local scripts/migrate-db.mjs --dev-reset",
     "db:seed:dev": "node --env-file=.env.local scripts/seed-dev-db.mjs",
+    "db:reset:dev": "pnpm db:up && pnpm db:migrate:dev-reset && pnpm db:seed:dev",
     "backfill:imdb": "node --env-file=.env.local scripts/backfill-imdb.mjs",
     "backfill:collections": "node --env-file=.env.local scripts/backfill-collections.mjs",
     "import:stock": "node --env-file=.env.local scripts/import-stock-csv.mjs",
-    "db:up": "docker compose up -d",
+    "db:up": "docker compose up -d --wait postgres",
     "db:down": "docker compose down"
   },
   "dependencies": {
@@ -24,13 +37,19 @@
   "devDependencies": {
     "@eslint/compat": "^2.1.0",
     "@tailwindcss/postcss": "^4.3.3",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
     "@types/node": "^26.1.1",
     "@types/pg": "^8.20.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.3.0",
     "eslint": "^10.7.0",
     "eslint-config-next": "16.2.10",
+    "jsdom": "^31.0.1",
+    "prettier": "^3.10.1",
     "tailwindcss": "^4.3.3",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^5.1.1"
   }
 }

@@ -29,7 +29,8 @@ export default async function InventoryTitlePage(props: PageProps<"/inventory/[i
           <div>
             <h1>{formatMovieTitleWithYear(movie.title, movie.releaseDate)}</h1>
             <p className="muted">
-              {formatMediaType(movie.mediaType)} | {movie.mediaType === "series" ? "First aired" : "Released"}{" "}
+              {formatMediaType(movie.mediaType)} |{" "}
+              {movie.mediaType === "series" ? "First aired" : "Released"}{" "}
               {formatLongDate(movie.releaseDate)} | Sort title {movie.sortTitle}
             </p>
           </div>
@@ -77,7 +78,9 @@ export default async function InventoryTitlePage(props: PageProps<"/inventory/[i
                   </span>
                 </td>
                 <td>{formatSealed(item.sealed)}</td>
-                <td>${item.dayPrice.toFixed(2)} / ${item.weekendPrice.toFixed(2)}</td>
+                <td>
+                  ${item.dayPrice.toFixed(2)} / ${item.weekendPrice.toFixed(2)}
+                </td>
                 <td>{item.lateClass}</td>
                 <td>
                   {item.linkedTitles.map((title) => formatLinkedTitleLabel(title)).join(", ")}

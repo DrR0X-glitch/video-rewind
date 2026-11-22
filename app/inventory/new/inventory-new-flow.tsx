@@ -3,7 +3,11 @@
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
-import { addDiscToExistingTitle, createTitleAndAddToDisc, createTitleOnly } from "@/app/inventory/new/actions";
+import {
+  addDiscToExistingTitle,
+  createTitleAndAddToDisc,
+  createTitleOnly,
+} from "@/app/inventory/new/actions";
 import { PosterSwatch } from "@/components/poster-swatch";
 import { ZONE_OPTIONS, formatZoneLabel } from "@/lib/constants";
 import { formatLinkedTitleLabel, formatMediaType, formatMovieTitleWithYear } from "@/lib/format";
@@ -135,7 +139,8 @@ export function InventoryNewFlow({
           generateBarcode: DEFAULT_DISC_DRAFT.generateBarcode,
         });
         setSectionOverride(
-          typeof parsedDefaults.sectionOverride === "string" && parsedDefaults.sectionOverride.trim()
+          typeof parsedDefaults.sectionOverride === "string" &&
+            parsedDefaults.sectionOverride.trim()
             ? parsedDefaults.sectionOverride
             : null,
         );
@@ -167,7 +172,14 @@ export function InventoryNewFlow({
 
     window.localStorage.setItem(DISC_DEFAULTS_STORAGE_KEY, JSON.stringify(defaultsToPersist));
     window.sessionStorage.removeItem(LEGACY_DISC_DEFAULTS_STORAGE_KEY);
-  }, [discDraft.format, discDraft.row, discDraft.sealed, discDraft.zone, hasLoadedDraft, sectionOverride]);
+  }, [
+    discDraft.format,
+    discDraft.row,
+    discDraft.sealed,
+    discDraft.zone,
+    hasLoadedDraft,
+    sectionOverride,
+  ]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -250,9 +262,7 @@ export function InventoryNewFlow({
   }
 
   function removeSelectedMovie(movieId: string) {
-    setSelectedMovies((currentMovies) =>
-      currentMovies.filter((movie) => movie.id !== movieId),
-    );
+    setSelectedMovies((currentMovies) => currentMovies.filter((movie) => movie.id !== movieId));
     setSeasonDrafts((currentDrafts) => {
       if (!currentDrafts[movieId]) {
         return currentDrafts;
@@ -280,7 +290,10 @@ export function InventoryNewFlow({
       return false;
     }
 
-    if (discDraft.row.trim() && (discDraft.row.trim().length < 1 || discDraft.row.trim().length > 2)) {
+    if (
+      discDraft.row.trim() &&
+      (discDraft.row.trim().length < 1 || discDraft.row.trim().length > 2)
+    ) {
       setFormError("Row must be 1 or 2 characters when provided.");
       return false;
     }
@@ -315,7 +328,9 @@ export function InventoryNewFlow({
       }
 
       if (!Number.isInteger(seasonEnd) || seasonEnd < seasonStart) {
-        setFormError(`Season end must be greater than or equal to season start for ${movie.title}.`);
+        setFormError(
+          `Season end must be greater than or equal to season start for ${movie.title}.`,
+        );
         return false;
       }
 
@@ -337,7 +352,9 @@ export function InventoryNewFlow({
       }
 
       if (!Number.isInteger(episodeEnd) || episodeEnd < episodeStart) {
-        setFormError(`Episode end must be greater than or equal to episode start for ${movie.title}.`);
+        setFormError(
+          `Episode end must be greater than or equal to episode start for ${movie.title}.`,
+        );
         return false;
       }
 
@@ -426,7 +443,9 @@ export function InventoryNewFlow({
                   <p className="muted">Showing up to 5 matches.</p>
                   <ul className="plain-list plain-actions">
                     {matches.map((movie) => {
-                      const isSelected = selectedMovies.some((selectedMovie) => selectedMovie.id === movie.id);
+                      const isSelected = selectedMovies.some(
+                        (selectedMovie) => selectedMovie.id === movie.id,
+                      );
 
                       return (
                         <li key={movie.id}>
@@ -459,33 +478,35 @@ export function InventoryNewFlow({
           <section className="panel section">
             <h2>2. Titles On Disc</h2>
             {selectedMovies.length <= SELECTED_TITLE_GRID_LIMIT ? (
-              <ul className="selected-title-grid">
-                {selectedMovies.map(renderSelectedMovie)}
-              </ul>
+              <ul className="selected-title-grid">{selectedMovies.map(renderSelectedMovie)}</ul>
             ) : (
               <ul className="plain-list plain-actions">
                 {selectedMovies.map((movie) => (
                   <li
                     key={movie.id}
-                    className={movie.id === selectedMovies[0]?.id ? "selected-title-primary" : undefined}
+                    className={
+                      movie.id === selectedMovies[0]?.id ? "selected-title-primary" : undefined
+                    }
                   >
-                    <span>{formatLinkedTitleLabel({
-                      title: movie.title,
-                      releaseDate: movie.releaseDate,
-                      mediaType: movie.mediaType,
-                      seasonStart: seasonDrafts[movie.id]?.seasonStart
-                        ? Number.parseInt(seasonDrafts[movie.id].seasonStart, 10)
-                        : undefined,
-                      seasonEnd: seasonDrafts[movie.id]?.seasonEnd
-                        ? Number.parseInt(seasonDrafts[movie.id].seasonEnd, 10)
-                        : undefined,
-                      episodeStart: seasonDrafts[movie.id]?.episodeStart
-                        ? Number.parseInt(seasonDrafts[movie.id].episodeStart, 10)
-                        : undefined,
-                      episodeEnd: seasonDrafts[movie.id]?.episodeEnd
-                        ? Number.parseInt(seasonDrafts[movie.id].episodeEnd, 10)
-                        : undefined,
-                    })}</span>
+                    <span>
+                      {formatLinkedTitleLabel({
+                        title: movie.title,
+                        releaseDate: movie.releaseDate,
+                        mediaType: movie.mediaType,
+                        seasonStart: seasonDrafts[movie.id]?.seasonStart
+                          ? Number.parseInt(seasonDrafts[movie.id].seasonStart, 10)
+                          : undefined,
+                        seasonEnd: seasonDrafts[movie.id]?.seasonEnd
+                          ? Number.parseInt(seasonDrafts[movie.id].seasonEnd, 10)
+                          : undefined,
+                        episodeStart: seasonDrafts[movie.id]?.episodeStart
+                          ? Number.parseInt(seasonDrafts[movie.id].episodeStart, 10)
+                          : undefined,
+                        episodeEnd: seasonDrafts[movie.id]?.episodeEnd
+                          ? Number.parseInt(seasonDrafts[movie.id].episodeEnd, 10)
+                          : undefined,
+                      })}
+                    </span>
                     <span className="muted">{formatMediaType(movie.mediaType)}</span>
                     <button type="button" onClick={() => removeSelectedMovie(movie.id)}>
                       Remove
@@ -548,7 +569,8 @@ export function InventoryNewFlow({
                 {formatMovieTitleWithYear(duplicateMovie.title, duplicateMovie.releaseDate)}
               </p>
               <p className="muted">
-                This TMDB title already exists in the catalogue. Add the disc to the existing title instead.
+                This TMDB title already exists in the catalogue. Add the disc to the existing title
+                instead.
               </p>
               <button type="button" onClick={() => addSelectedMovie(duplicateMovie)}>
                 Use Existing Title
@@ -590,7 +612,9 @@ export function InventoryNewFlow({
                     </div>
                   </dl>
                   <div className="split-action-row">
-                    <button type="submit" className="action-grow-two">Add To Disc</button>
+                    <button type="submit" className="action-grow-two">
+                      Add To Disc
+                    </button>
                     <button type="submit" formAction={createTitleOnly} className="action-grow-one">
                       Create Title
                     </button>
@@ -647,7 +671,9 @@ function DiscFields({
               name="format"
               value="blu-ray"
               checked={discDraft.format === "blu-ray"}
-              onChange={() => setDiscDraft((currentDraft) => ({ ...currentDraft, format: "blu-ray" }))}
+              onChange={() =>
+                setDiscDraft((currentDraft) => ({ ...currentDraft, format: "blu-ray" }))
+              }
             />
             <span>Blu-ray</span>
           </label>
@@ -657,7 +683,9 @@ function DiscFields({
               name="format"
               value="4k-uhd"
               checked={discDraft.format === "4k-uhd"}
-              onChange={() => setDiscDraft((currentDraft) => ({ ...currentDraft, format: "4k-uhd" }))}
+              onChange={() =>
+                setDiscDraft((currentDraft) => ({ ...currentDraft, format: "4k-uhd" }))
+              }
             />
             <span>4K UHD</span>
           </label>
@@ -695,11 +723,10 @@ function DiscFields({
           required
           maxLength={2}
           value={sectionValue}
-          onChange={(event) =>
-            {
-              const nextValue = event.target.value.toUpperCase().slice(0, 2);
-              setSectionOverride(nextValue);
-            }}
+          onChange={(event) => {
+            const nextValue = event.target.value.toUpperCase().slice(0, 2);
+            setSectionOverride(nextValue);
+          }}
         />
       </label>
       <label>
@@ -710,7 +737,10 @@ function DiscFields({
           maxLength={2}
           value={discDraft.row}
           onChange={(event) =>
-            setDiscDraft((currentDraft) => ({ ...currentDraft, row: event.target.value.toUpperCase().slice(0, 2) }))
+            setDiscDraft((currentDraft) => ({
+              ...currentDraft,
+              row: event.target.value.toUpperCase().slice(0, 2),
+            }))
           }
         />
       </label>

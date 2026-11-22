@@ -13,7 +13,9 @@ export function MovieCard({
   variant?: "default" | "rail";
 }) {
   const isRail = variant === "rail";
-  const imageSizes = isRail ? "(max-width: 700px) 138px, (max-width: 960px) 146px, 156px" : "(max-width: 768px) 50vw, 180px";
+  const imageSizes = isRail
+    ? "(max-width: 700px) 138px, (max-width: 960px) 146px, 156px"
+    : "(max-width: 768px) 50vw, 180px";
 
   return (
     <article className={isRail ? "movie-card movie-card-rail" : "movie-card"}>
@@ -29,10 +31,7 @@ export function MovieCard({
             />
           </div>
         ) : (
-          <PosterSwatch
-            title={movie.title}
-            color={movie.posterColor}
-          />
+          <PosterSwatch title={movie.title} color={movie.posterColor} />
         )}
       </Link>
       <div className="card-copy">

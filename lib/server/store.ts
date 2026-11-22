@@ -1,3 +1,5 @@
+import "server-only";
+
 import { ZONE_OPTIONS, formatZoneLabel } from "@/lib/constants";
 import { pool } from "@/lib/server/db";
 import { fetchOmdbTitleMetadataByImdbId } from "@/lib/server/omdb";
@@ -186,9 +188,7 @@ function getFormatPrioritySql(column: string) {
   return `(CASE ${column}::text WHEN '4k-uhd' THEN 0 WHEN 'blu-ray' THEN 1 ELSE 2 END)`;
 }
 
-async function allocateLowestInventoryCode(
-  client: { query: typeof pool.query },
-) {
+async function allocateLowestInventoryCode(client: { query: typeof pool.query }) {
   const result = await client.query<{ inventory_code: string }>(
     `
       SELECT LPAD(candidate.code::text, 6, '0') AS inventory_code
@@ -307,9 +307,7 @@ function toUiInventoryItem(item: InventoryItemRow): InventoryItem {
     section: item.section,
     row: item.row,
     locationCode: item.location_code,
-    linkedTitles: Array.isArray(item.linked_titles)
-      ? item.linked_titles.map(toUiLinkedTitle)
-      : [],
+    linkedTitles: Array.isArray(item.linked_titles) ? item.linked_titles.map(toUiLinkedTitle) : [],
     notes: item.notes,
     lastRentedAt: formatDateOnly(item.last_rented_at) ?? undefined,
     dayPrice: Number(item.day_price),
@@ -340,8 +338,11 @@ function toUiTitle(row: TitleRow, inventoryItems: InventoryItem[] = []): MovieWi
     posterUrl: formatPosterUrl(row.poster_path, "detail"),
     posterColor: getPosterColor(row.title),
     genres: row.genres ?? [],
-    director: row.director || (row.media_type === "series" ? "Creator pending" : "Director pending"),
-    cast: normalizeCast(row.cast_members).map((member) => member.name).filter(Boolean),
+    director:
+      row.director || (row.media_type === "series" ? "Creator pending" : "Director pending"),
+    cast: normalizeCast(row.cast_members)
+      .map((member) => member.name)
+      .filter(Boolean),
     inventoryItems,
     availableCount: row.available_count,
     totalCopies: row.total_copies,
@@ -364,7 +365,9 @@ function buildListTitlesQuery(filters: MovieFilters) {
   const values: Array<string | number> = [];
   let searchRankSql = "0";
   const normalizedPageSize =
-    typeof filters.pageSize === "number" && Number.isInteger(filters.pageSize) && filters.pageSize > 0
+    typeof filters.pageSize === "number" &&
+    Number.isInteger(filters.pageSize) &&
+    filters.pageSize > 0
       ? filters.pageSize
       : undefined;
   const normalizedPage =
@@ -478,21 +481,20 @@ function buildListTitlesQuery(filters: MovieFilters) {
     } else {
       values.push(filters.decade);
       values.push(filters.decade + 10);
-      conditions.push(`t.release_date >= MAKE_DATE($${values.length - 1}, 1, 1) AND t.release_date < MAKE_DATE($${values.length}, 1, 1)`);
+      conditions.push(
+        `t.release_date >= MAKE_DATE($${values.length - 1}, 1, 1) AND t.release_date < MAKE_DATE($${values.length}, 1, 1)`,
+      );
     }
   }
 
-  const whereClause =
-    conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
   const limitClause =
     typeof filters.limit === "number" && filters.limit > 0
       ? `LIMIT ${Math.max(1, Math.floor(filters.limit))}`
       : "";
   const pageLimitClause =
-    typeof normalizedPageSize === "number"
-      ? `LIMIT ${normalizedPageSize}`
-      : "";
+    typeof normalizedPageSize === "number" ? `LIMIT ${normalizedPageSize}` : "";
   const offsetClause =
     typeof normalizedPageSize === "number"
       ? `OFFSET ${(normalizedPage - 1) * normalizedPageSize}`
@@ -501,14 +503,14 @@ function buildListTitlesQuery(filters: MovieFilters) {
     filters.search && (!filters.sort || filters.sort === "title")
       ? "ORDER BY search_rank DESC, t.sort_title ASC, t.title ASC"
       : filters.sort === "rating-desc"
-      ? "ORDER BY t.imdb_rating DESC NULLS LAST, t.sort_title ASC, t.title ASC"
-      : filters.sort === "popular"
-        ? "ORDER BY COUNT(DISTINCT i.id) DESC, MAX(i.last_rented_at) DESC NULLS LAST, t.imdb_rating DESC NULLS LAST, t.sort_title ASC"
-        : filters.sort === "year-desc"
-          ? "ORDER BY t.release_date DESC NULLS LAST, t.sort_title ASC, t.title ASC"
-          : filters.sort === "year-asc"
-            ? "ORDER BY t.release_date ASC NULLS LAST, t.sort_title ASC, t.title ASC"
-            : "ORDER BY t.sort_title ASC, t.title ASC";
+        ? "ORDER BY t.imdb_rating DESC NULLS LAST, t.sort_title ASC, t.title ASC"
+        : filters.sort === "popular"
+          ? "ORDER BY COUNT(DISTINCT i.id) DESC, MAX(i.last_rented_at) DESC NULLS LAST, t.imdb_rating DESC NULLS LAST, t.sort_title ASC"
+          : filters.sort === "year-desc"
+            ? "ORDER BY t.release_date DESC NULLS LAST, t.sort_title ASC, t.title ASC"
+            : filters.sort === "year-asc"
+              ? "ORDER BY t.release_date ASC NULLS LAST, t.sort_title ASC, t.title ASC"
+              : "ORDER BY t.sort_title ASC, t.title ASC";
 
   return {
     text: `
@@ -773,15 +775,13 @@ function normalizeOptionalSeasonNumber(value: unknown, fieldName: string) {
   throw createHttpError(400, `Field "${fieldName}" is invalid`);
 }
 
-function validateSeasonRange(
-  title: {
-    titleId: string;
-    seasonStart: number | null;
-    seasonEnd: number | null;
-    episodeStart: number | null;
-    episodeEnd: number | null;
-  },
-) {
+function validateSeasonRange(title: {
+  titleId: string;
+  seasonStart: number | null;
+  seasonEnd: number | null;
+  episodeStart: number | null;
+  episodeEnd: number | null;
+}) {
   if (title.seasonEnd !== null && title.seasonStart === null) {
     throw createHttpError(400, 'Field "season_end" requires "season_start"');
   }
@@ -791,7 +791,10 @@ function validateSeasonRange(
     title.seasonEnd !== null &&
     title.seasonEnd < title.seasonStart
   ) {
-    throw createHttpError(400, 'Field "season_end" must be greater than or equal to "season_start"');
+    throw createHttpError(
+      400,
+      'Field "season_end" must be greater than or equal to "season_start"',
+    );
   }
 
   if (title.episodeEnd !== null && title.episodeStart === null) {
@@ -803,7 +806,10 @@ function validateSeasonRange(
     title.episodeEnd !== null &&
     title.episodeEnd < title.episodeStart
   ) {
-    throw createHttpError(400, 'Field "episode_end" must be greater than or equal to "episode_start"');
+    throw createHttpError(
+      400,
+      'Field "episode_end" must be greater than or equal to "episode_start"',
+    );
   }
 
   if (title.episodeStart !== null && title.seasonStart === null) {
@@ -859,14 +865,18 @@ function parseInventoryTitleLinks(body: Record<string, unknown>) {
     }
   }
 
-  const titleIds =
-    Array.isArray(body.title_ids)
-      ? body.title_ids.filter((value): value is string => typeof value === "string" && value.trim() !== "")
-      : typeof body.title_ids === "string"
-        ? body.title_ids.split(",").map((value) => value.trim()).filter(Boolean)
-        : typeof body.movie_id === "string" && body.movie_id.trim()
-          ? [body.movie_id.trim()]
-          : [];
+  const titleIds = Array.isArray(body.title_ids)
+    ? body.title_ids.filter(
+        (value): value is string => typeof value === "string" && value.trim() !== "",
+      )
+    : typeof body.title_ids === "string"
+      ? body.title_ids
+          .split(",")
+          .map((value) => value.trim())
+          .filter(Boolean)
+      : typeof body.movie_id === "string" && body.movie_id.trim()
+        ? [body.movie_id.trim()]
+        : [];
 
   const seasonStarts = Array.isArray(body.season_starts) ? body.season_starts : [];
   const seasonEnds = Array.isArray(body.season_ends) ? body.season_ends : [];
@@ -888,7 +898,10 @@ export async function checkDatabaseHealth() {
   await pool.query("SELECT 1");
 }
 
-export async function getMovieFiltersFromDatabase(): Promise<{ genres: string[]; years: number[] }> {
+export async function getMovieFiltersFromDatabase(): Promise<{
+  genres: string[];
+  years: number[];
+}> {
   const result = await pool.query<{ genres: string[] | null; release_date: string | Date | null }>(
     `
       SELECT DISTINCT t.genres, t.release_date
@@ -982,11 +995,7 @@ export async function listInventoryTitlesFromDatabase(query?: string, limit?: nu
   return rows.map((row) => toUiTitle(row));
 }
 
-export async function listInventoryTitlesPageFromDatabase(
-  query?: string,
-  page = 1,
-  pageSize = 50,
-) {
+export async function listInventoryTitlesPageFromDatabase(query?: string, page = 1, pageSize = 50) {
   const pageResult = await listMoviesPageFromDatabase({
     search: query?.trim() || undefined,
     available: false,
@@ -1370,9 +1379,7 @@ export async function createMovieInDatabase(input: {
       tmdbId: input.tmdbId,
       imdbId: omdbMetadata?.imdbId ?? normalizedImdbId,
       imdbRating:
-        input.imdbRating === undefined
-          ? (omdbMetadata?.imdbRating ?? null)
-          : input.imdbRating,
+        input.imdbRating === undefined ? (omdbMetadata?.imdbRating ?? null) : input.imdbRating,
       mediaType: normalizeMediaType(input.mediaType),
       title: normalizedTitle,
       sortTitle: normalizedSortTitle,
@@ -1540,7 +1547,9 @@ async function upsertCollectionForTitle(
       collection.name,
       getSuggestedSortTitle(collection.name),
       anchorTitle?.title ?? collection.name,
-      anchorTitle ? getSuggestedSortTitle(anchorTitle.title) : getSuggestedSortTitle(collection.name),
+      anchorTitle
+        ? getSuggestedSortTitle(anchorTitle.title)
+        : getSuggestedSortTitle(collection.name),
       anchorTitle?.releaseDate || null,
       collection.overview,
       collection.posterPath,
@@ -1566,9 +1575,7 @@ async function upsertCollectionForTitle(
     [tmdbIds],
   );
 
-  const existingByTmdbId = new Map(
-    existingTitles.rows.map((row) => [row.tmdb_id, row.id]),
-  );
+  const existingByTmdbId = new Map(existingTitles.rows.map((row) => [row.tmdb_id, row.id]));
   const linkedTitleIds: string[] = [];
 
   for (const [index, title] of collection.titles.entries()) {
@@ -2134,8 +2141,7 @@ export async function createInventoryItemInDatabase(body: Record<string, unknown
   const lastRentedAt = optionalString(body.last_rented_at);
   const availability =
     body.availability === undefined ? true : normalizeAvailability(body.availability);
-  const reviewed =
-    body.reviewed === undefined ? false : normalizeAvailability(body.reviewed);
+  const reviewed = body.reviewed === undefined ? false : normalizeAvailability(body.reviewed);
   const dayPrice = body.day_price === undefined ? 0 : normalizeMoney(body.day_price, "day_price");
   const weekendPrice =
     body.weekend_price === undefined ? 0 : normalizeMoney(body.weekend_price, "weekend_price");
@@ -2257,7 +2263,7 @@ export async function updateMovieInDatabase(id: string, body: Record<string, unk
   const title = body.title === undefined ? null : requireNonEmptyString(body.title, "title");
   const sortTitle =
     body.sort_title === undefined ? null : requireNonEmptyString(body.sort_title, "sort_title");
-  const overview = body.overview === undefined ? null : optionalString(body.overview) ?? "";
+  const overview = body.overview === undefined ? null : (optionalString(body.overview) ?? "");
   const releaseDate = body.release_date === undefined ? null : optionalString(body.release_date);
   const mediaType = body.media_type === undefined ? null : normalizeMediaType(body.media_type);
   const featured =
@@ -2284,7 +2290,7 @@ export async function updateMovieInDatabase(id: string, body: Record<string, unk
             : (() => {
                 throw createHttpError(400, 'Field "hide_from_homepage" is invalid');
               })();
-  const director = body.director === undefined ? null : optionalString(body.director) ?? "";
+  const director = body.director === undefined ? null : (optionalString(body.director) ?? "");
   const posterPath =
     body.poster_path === undefined
       ? null
@@ -2295,9 +2301,14 @@ export async function updateMovieInDatabase(id: string, body: Record<string, unk
     body.genres === undefined
       ? null
       : Array.isArray(body.genres)
-        ? body.genres.flatMap((value) => (typeof value === "string" && value.trim() ? [value.trim()] : []))
+        ? body.genres.flatMap((value) =>
+            typeof value === "string" && value.trim() ? [value.trim()] : [],
+          )
         : typeof body.genres === "string"
-          ? body.genres.split(",").map((value) => value.trim()).filter(Boolean)
+          ? body.genres
+              .split(",")
+              .map((value) => value.trim())
+              .filter(Boolean)
           : (() => {
               throw createHttpError(400, 'Field "genres" is invalid');
             })();
@@ -2305,9 +2316,14 @@ export async function updateMovieInDatabase(id: string, body: Record<string, unk
     body.cast === undefined
       ? null
       : Array.isArray(body.cast)
-        ? body.cast.flatMap((value) => (typeof value === "string" && value.trim() ? [value.trim()] : []))
+        ? body.cast.flatMap((value) =>
+            typeof value === "string" && value.trim() ? [value.trim()] : [],
+          )
         : typeof body.cast === "string"
-          ? body.cast.split(",").map((value) => value.trim()).filter(Boolean)
+          ? body.cast
+              .split(",")
+              .map((value) => value.trim())
+              .filter(Boolean)
           : (() => {
               throw createHttpError(400, 'Field "cast" is invalid');
             })();
@@ -2402,12 +2418,16 @@ export async function deleteMovieFromDatabase(id: string) {
 
 export async function bulkUpdateMoviesInDatabase(body: Record<string, unknown>) {
   const action = optionalString(body.action);
-  const titleIds =
-    Array.isArray(body.title_ids)
-      ? body.title_ids.filter((value): value is string => typeof value === "string" && value.trim() !== "")
-      : typeof body.title_ids === "string"
-        ? body.title_ids.split(",").map((value) => value.trim()).filter(Boolean)
-        : [];
+  const titleIds = Array.isArray(body.title_ids)
+    ? body.title_ids.filter(
+        (value): value is string => typeof value === "string" && value.trim() !== "",
+      )
+    : typeof body.title_ids === "string"
+      ? body.title_ids
+          .split(",")
+          .map((value) => value.trim())
+          .filter(Boolean)
+      : [];
 
   if (!action) {
     throw createHttpError(400, 'Field "action" is required');
@@ -2483,17 +2503,15 @@ export async function updateInventoryItemInDatabase(id: string, body: Record<str
     zone: body.zone === undefined ? null : normalizeZone(body.zone),
     section: body.section === undefined ? null : normalizeLocationPart(body.section, "section"),
     row: body.row === undefined ? null : normalizeRowPart(body.row),
-    notes: body.notes === undefined ? null : optionalString(body.notes) ?? "",
+    notes: body.notes === undefined ? null : (optionalString(body.notes) ?? ""),
     lastRentedAt: body.last_rented_at === undefined ? null : optionalString(body.last_rented_at),
     dayPrice: body.day_price === undefined ? null : normalizeMoney(body.day_price, "day_price"),
-    weekendPrice: body.weekend_price === undefined ? null : normalizeMoney(body.weekend_price, "weekend_price"),
+    weekendPrice:
+      body.weekend_price === undefined ? null : normalizeMoney(body.weekend_price, "weekend_price"),
     lateClass: body.late_class === undefined ? null : normalizeLateClass(body.late_class),
   };
 
-  if (
-    Object.values(updateValues).every((value) => value === null) &&
-    titleLinks === null
-  ) {
+  if (Object.values(updateValues).every((value) => value === null) && titleLinks === null) {
     throw createHttpError(400, "Request body must include at least one updatable field");
   }
   const client = await pool.connect();
@@ -2582,7 +2600,10 @@ export async function updateInventoryItemInDatabase(id: string, body: Record<str
   }
 }
 
-export async function bulkUpdateMovieInventoryInDatabase(titleId: string, body: Record<string, unknown>) {
+export async function bulkUpdateMovieInventoryInDatabase(
+  titleId: string,
+  body: Record<string, unknown>,
+) {
   const updates = body.updates;
 
   if (!Array.isArray(updates) || updates.length === 0) {
@@ -2623,7 +2644,10 @@ export async function bulkUpdateMovieInventoryInDatabase(titleId: string, body: 
       );
 
       if (result.rowCount === 0) {
-        throw createHttpError(404, "One or more inventory items were not found for the specified title");
+        throw createHttpError(
+          404,
+          "One or more inventory items were not found for the specified title",
+        );
       }
     }
 
@@ -2647,12 +2671,16 @@ export async function bulkUpdateInventoryItemsInDatabase(body: Record<string, un
   const zone = applyZone ? normalizeZone(body.zone) : null;
   const section = applySection ? normalizeLocationPart(body.section, "section") : null;
   const row = applyRow ? normalizeRowPart(body.row) : null;
-  const inventoryIds =
-    Array.isArray(body.inventory_ids)
-      ? body.inventory_ids.filter((value): value is string => typeof value === "string" && value.trim() !== "")
-      : typeof body.inventory_ids === "string"
-        ? body.inventory_ids.split(",").map((value) => value.trim()).filter(Boolean)
-        : [];
+  const inventoryIds = Array.isArray(body.inventory_ids)
+    ? body.inventory_ids.filter(
+        (value): value is string => typeof value === "string" && value.trim() !== "",
+      )
+    : typeof body.inventory_ids === "string"
+      ? body.inventory_ids
+          .split(",")
+          .map((value) => value.trim())
+          .filter(Boolean)
+      : [];
   const uniqueInventoryIds = Array.from(new Set(inventoryIds));
 
   if (uniqueInventoryIds.length === 0) {
@@ -2712,7 +2740,14 @@ export async function bulkUpdateInventoryItemsInDatabase(body: Record<string, un
           updated_at = NOW()
         WHERE id = ANY($1::uuid[]);
       `,
-      [uniqueInventoryIds, applyAvailability ? availability : null, applyReviewed ? reviewed : null, zone, section, row],
+      [
+        uniqueInventoryIds,
+        applyAvailability ? availability : null,
+        applyReviewed ? reviewed : null,
+        zone,
+        section,
+        row,
+      ],
     );
 
     return { updatedCount: result.rowCount ?? 0 };

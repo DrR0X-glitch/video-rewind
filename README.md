@@ -4,11 +4,14 @@ Next.js app for the Video Rewind public site and inventory UI. The app owns the 
 
 ## Development
 
-1. Copy envs in this frontend app:
+1. Copy the example env file for the app and Docker Compose:
 
 ```bash
 cp .env.example .env.local
+cp .env.example .env
 ```
+
+The Compose PostgreSQL service publishes on port `5432`.
 
 Add your TMDB read token to `.env.local`:
 
@@ -39,20 +42,43 @@ PGDATABASE=dbname
 pnpm install
 ```
 
-3. Start PostgreSQL:
+3. Start PostgreSQL, apply migrations, and load the sample catalogue and inventory:
 
 ```bash
-pnpm db:up
+pnpm db:reset:dev
 ```
 
-4. Initialize the schema and run the app:
+This is also the reset command. It clears catalogue and inventory records and reloads the development fixtures. Use it only when that reset is intended.
+
+4. Start the app:
 
 ```bash
-pnpm db:init
 pnpm dev
 ```
 
 Open `http://localhost:3000`.
+
+`pnpm db:down` stops the Compose services while keeping the local database volume. To deliberately discard the local database and start fresh, run `docker compose down -v`, then repeat the setup steps.
+
+### Existing local database
+
+The normal migration command will not replay the baseline against a database that already has application tables. Back up and verify that it matches the current schema, then record the baseline without rerunning its SQL:
+
+```bash
+pnpm db:migrate:baseline
+```
+
+For future schema changes, add a new numbered SQL file under `db/migrations/` and run `pnpm db:migrate`. Never edit a migration after it has been applied; add another migration instead.
+
+### Local database tests
+
+There is one Compose PostgreSQL service for development. `pnpm db:reset:dev` validates and records the current baseline when it finds the existing schema without migration history; it applies the baseline SQL only to an empty database. It then reseeds the development fixtures. Database integration tests use the same local `dvd_store` database and only read its migration and seed state. After preparing the database, run:
+
+```bash
+pnpm test:database
+```
+
+The integration suite is read-only. The explicit reset command replaces local catalogue and inventory data with fixtures; do not use it if you need to keep local edits.
 
 For LAN testing in production mode without dev websocket issues:
 
@@ -64,11 +90,14 @@ pnpm exec next start --hostname 0.0.0.0 --port 3000
 For a containerized local deployment with Postgres:
 
 ```bash
-docker compose up --build
+docker compose up -d postgres
+docker compose run --rm db-migrate
+docker compose run --rm db-seed
+docker compose up --build app
 ```
 
-The app will be available on `http://localhost:3000` and will initialize the database schema on container start.
-Provide `TMDB_API_READ_ACCESS_TOKEN` and `OMDB_API_KEY` through your shell environment or a Compose `.env` file before building if you need TMDB/OMDb-backed title creation.
+The app will be available on `http://localhost:3000`. Migrations and sample seeding are explicit local commands; the application container does not modify the database schema or seed records on startup. Compose credentials are for local development only.
+Provide `TMDB_API_READ_ACCESS_TOKEN` and `OMDB_API_KEY` through your shell environment or a Compose `.env` file if you need TMDB/OMDb-backed title creation.
 
 To backfill missing IMDb ids and ratings on existing titles:
 
@@ -112,56 +141,57 @@ pnpm import:stock -- ./path/to/stock.csv --verbose
 
 ## App Routes
 
-* `/`
-* `/search`
-* `/about`
-* `/contact`
-* `/movies/:id`
-* `/inventory`
-* `/inventory/:id`
-* `/inventory/:id/edit`
-* `/inventory/discs/:id`
-* `/inventory/discs/:id/label`
-* `/inventory/new`
-* `/inventory/review`
-* `/inventory/stock`
+- `/`
+- `/search`
+- `/about`
+- `/contact`
+- `/movies/:id`
+- `/inventory`
+- `/inventory/:id`
+- `/inventory/:id/edit`
+- `/inventory/discs/:id`
+- `/inventory/discs/:id/label`
+- `/inventory/new`
+- `/inventory/review`
+- `/inventory/stock`
 
 ## API Routes
 
-* `GET /api/health`
-* `GET /api/movies`
-* `GET /api/movies/:id`
-* `PATCH /api/movies/:id`
-* `DELETE /api/movies/:id`
-* `POST /api/movies/bulk`
-* `GET /api/tmdb/movie?url=...`
-* `POST /api/inventory`
-* `PATCH /api/inventory/:id`
-* `PATCH /api/movies/:id/inventory`
+- `GET /api/health`
+- `GET /api/movies`
+- `GET /api/movies/:id`
+- `PATCH /api/movies/:id`
+- `DELETE /api/movies/:id`
+- `POST /api/movies/bulk`
+- `GET /api/tmdb/movie?url=...`
+- `POST /api/inventory`
+- `PATCH /api/inventory/:id`
+- `PATCH /api/movies/:id/inventory`
 
 ## Notes
 
-* PostgreSQL is fully managed from this repo via [docker-compose.yml](/Users/zach/Coding/Clients/DVD/dvd-store/dvd-store-frontend/docker-compose.yml) and [db/schema.sql](/Users/zach/Coding/Clients/DVD/dvd-store/dvd-store-frontend/db/schema.sql).
-* The repo now includes a production [Dockerfile](/Users/zach/Coding/Clients/DVD/dvd-store/dvd-store-frontend/Dockerfile) using Next standalone output, plus an app service in [docker-compose.yml](/Users/zach/Coding/Clients/DVD/dvd-store/dvd-store-frontend/docker-compose.yml).
-* For an existing database, run `pnpm db:init` after schema changes.
-* Verification for this repo is `pnpm lint` and `pnpm build`.
-* The app persists `sort_title`, `director`, `featured`, structured location fields, and `last_rented_at`.
-* Title creation from TMDB also stores the TMDB-linked `imdb_id`, and if `OMDB_API_KEY` is configured it looks up and stores the IMDb rating for public display.
-* TMDB collections are stored separately and only link to titles that already exist locally. Creating one title will not auto-create sibling titles.
-* The `backfill:collections` script fills missing TMDB collection links for existing movie titles. CSV stock import does not currently create collection links during import.
-* Inventory routes use a separate nav: `Homepage`, `Titles`, `Stock`, `Review`, `New`.
-* Each disc gets a six-digit internal `inventory_code` when it is created. Label workflows print that existing code; they do not allocate a new one later.
-* New discs start as not reviewed, so they stay off the public site until staff review them.
-* `/inventory/stock` now shows reviewed stock only.
-* `/inventory/review` is the unreviewed queue, with shift-range selection, bulk mark-reviewed, bulk delete, per-row review actions, and sort grouped by Primary then Duplicate.
-* Barcode labels are rendered as Code 128 SVG and can be printed from disc and stock workflows.
-* The stock view is a searchable, sortable disc table for reviewed stock with preset links for `All Discs` and `Wall`, visible filters including `Primary`, shift-range row selection, bulk edit/delete actions, pagination, and a `Show All` mode.
-* Primary/duplicate status is calculated automatically from highest format quality (`4K UHD`, `Blu-ray`, `DVD`) and then lowest `inventory_code`.
-* The public homepage uses horizontal browse rows for featured titles, highest rated movies, popular movies, popular TV, recently returned, and top genres, with a compact search form in the intro panel.
-* Titles can be marked `Hide from homepage` by staff to keep niche items such as concert recordings out of homepage rails without removing them from public search or detail pages.
-* The public `/search` page is the full catalogue view with search, decade/genre/availability filters, and sort controls across title, genre, cast, director, and overview text.
-* Public title pages include a back link and a compact per-copy table sorted by highest quality first.
-* The public shell now includes a logo-style `Video Rewind` header mark and a minimal footer with a staff link to inventory.
-* Search now uses PostgreSQL relevance ranking with title-first matches and lower-priority metadata fallback, instead of plain substring ordering.
-* DB-backed pages are request-rendered in production so container/image builds do not require a live PostgreSQL connection.
-* TMDB is authenticated using a TMDB API Read Access Token sent as a Bearer token, which matches TMDB's official application-auth docs: https://developer.themoviedb.org/docs/authentication-application and https://developer.themoviedb.org/reference/getting-started
+- PostgreSQL is managed locally with Docker Compose; ordered database migrations live in `db/migrations/`.
+- The repo now includes a production [Dockerfile](/Users/zach/Coding/Clients/DVD/dvd-store/dvd-store-frontend/Dockerfile) using Next standalone output, plus an app service in [docker-compose.yml](/Users/zach/Coding/Clients/DVD/dvd-store/dvd-store-frontend/docker-compose.yml).
+- For an existing local database without migration history, verify and back it up before running `pnpm db:migrate:baseline`.
+- Local verification commands are `pnpm test` for server and browser unit tests, `pnpm test:database` for PostgreSQL integration checks, `pnpm lint` for ESLint, `pnpm typecheck` for TypeScript, `pnpm format:check` for formatting, and `pnpm build` for a production build. No CI pipeline is configured.
+- Run `pnpm test:watch` while developing. Use `pnpm format` to apply the configured Prettier formatting.
+- The app persists `sort_title`, `director`, `featured`, structured location fields, and `last_rented_at`.
+- Title creation from TMDB also stores the TMDB-linked `imdb_id`, and if `OMDB_API_KEY` is configured it looks up and stores the IMDb rating for public display.
+- TMDB collections are stored separately and only link to titles that already exist locally. Creating one title will not auto-create sibling titles.
+- The `backfill:collections` script fills missing TMDB collection links for existing movie titles. CSV stock import does not currently create collection links during import.
+- Inventory routes use a separate nav: `Homepage`, `Titles`, `Stock`, `Review`, `New`.
+- Each disc gets a six-digit internal `inventory_code` when it is created. Label workflows print that existing code; they do not allocate a new one later.
+- New discs start as not reviewed, so they stay off the public site until staff review them.
+- `/inventory/stock` now shows reviewed stock only.
+- `/inventory/review` is the unreviewed queue, with shift-range selection, bulk mark-reviewed, bulk delete, per-row review actions, and sort grouped by Primary then Duplicate.
+- Barcode labels are rendered as Code 128 SVG and can be printed from disc and stock workflows.
+- The stock view is a searchable, sortable disc table for reviewed stock with preset links for `All Discs` and `Wall`, visible filters including `Primary`, shift-range row selection, bulk edit/delete actions, pagination, and a `Show All` mode.
+- Primary/duplicate status is calculated automatically from highest format quality (`4K UHD`, `Blu-ray`, `DVD`) and then lowest `inventory_code`.
+- The public homepage uses horizontal browse rows for featured titles, highest rated movies, popular movies, popular TV, recently returned, and top genres, with a compact search form in the intro panel.
+- Titles can be marked `Hide from homepage` by staff to keep niche items such as concert recordings out of homepage rails without removing them from public search or detail pages.
+- The public `/search` page is the full catalogue view with search, decade/genre/availability filters, and sort controls across title, genre, cast, director, and overview text.
+- Public title pages include a back link and a compact per-copy table sorted by highest quality first.
+- The public shell now includes a logo-style `Video Rewind` header mark and a minimal footer with a staff link to inventory.
+- Search now uses PostgreSQL relevance ranking with title-first matches and lower-priority metadata fallback, instead of plain substring ordering.
+- DB-backed pages are request-rendered in production so container/image builds do not require a live PostgreSQL connection.
+- TMDB is authenticated using a TMDB API Read Access Token sent as a Bearer token, which matches TMDB's official application-auth docs: https://developer.themoviedb.org/docs/authentication-application and https://developer.themoviedb.org/reference/getting-started

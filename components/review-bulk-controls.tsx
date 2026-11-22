@@ -25,9 +25,15 @@ export function ReviewBulkControls() {
   return (
     <div className="stock-bulk-controls">
       <div className="bulk-toolbar">
-        <button type="submit" name="action" value="review-selected">Mark Selected Reviewed</button>
-        <button type="button" onClick={clearSelection}>Clear Selected</button>
-        <button type="submit" name="action" value="delete">Delete Selected</button>
+        <button type="submit" name="action" value="review-selected">
+          Mark Selected Reviewed
+        </button>
+        <button type="button" onClick={clearSelection}>
+          Clear Selected
+        </button>
+        <button type="submit" name="action" value="delete">
+          Delete Selected
+        </button>
       </div>
       <p className="muted stock-selected-count">{selectedCount} selected</p>
     </div>

@@ -9,7 +9,6 @@ import {
   formatMediaType,
   formatLongDate,
   formatMovieTitleWithYear,
-  formatReleaseYear,
   formatDiscFormat,
   getAvailabilityLabel,
 } from "@/lib/format";
@@ -43,15 +42,13 @@ export default async function MovieDetailPage(props: PageProps<"/movies/[id]">) 
             </div>
           </div>
         ) : (
-          <PosterSwatch
-            title={movie.title}
-            color={movie.posterColor}
-            size="detail"
-          />
+          <PosterSwatch title={movie.title} color={movie.posterColor} size="detail" />
         )}
         <section className="detail-copy">
           <h1>{formatMovieTitleWithYear(movie.title, movie.releaseDate)}</h1>
-          <p className="muted">{formatMediaType(movie.mediaType)} | Sort title: {movie.sortTitle}</p>
+          <p className="muted">
+            {formatMediaType(movie.mediaType)} | Sort title: {movie.sortTitle}
+          </p>
           <p>{movie.overview}</p>
           <dl className="meta-list">
             <div>

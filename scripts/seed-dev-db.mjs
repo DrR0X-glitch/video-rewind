@@ -3,18 +3,18 @@ import pg from "pg";
 const { Pool } = pg;
 
 function getConnectionConfig() {
-  if (process.env.DATABASE_URL) {
+  const configuredUrl = process.env.DATABASE_URL;
+
+  if (configuredUrl) {
     try {
-      new URL(process.env.DATABASE_URL);
+      new URL(configuredUrl);
     } catch {
       throw new Error(
         "Invalid DATABASE_URL. Use a full Postgres URL like postgres://user:password@localhost:5432/dbname",
       );
     }
 
-    return {
-      connectionString: process.env.DATABASE_URL,
-    };
+    return { connectionString: configuredUrl };
   }
 
   return {
@@ -24,6 +24,31 @@ function getConnectionConfig() {
     password: process.env.PGPASSWORD ?? "dvd",
     database: process.env.PGDATABASE ?? "dvd_store",
   };
+}
+
+function assertSafeSeedTarget() {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Refusing to run development seed data with NODE_ENV=production.");
+  }
+
+  const configuredUrl = process.env.DATABASE_URL;
+
+  let hostname = process.env.PGHOST ?? "localhost";
+  let databaseName = process.env.PGDATABASE ?? "dvd_store";
+  if (configuredUrl) {
+    const databaseUrl = new URL(configuredUrl);
+    hostname = databaseUrl.hostname;
+    databaseName = decodeURIComponent(databaseUrl.pathname.replace(/^\//, ""));
+  }
+
+  const allowedHosts = new Set(["localhost", "127.0.0.1", "postgres"]);
+  const allowedDatabases = new Set(["dvd_store"]);
+
+  if (!allowedHosts.has(hostname) || !allowedDatabases.has(databaseName)) {
+    throw new Error(
+      `Refusing to seed ${hostname}/${databaseName}. Development seeds are restricted to the local dvd_store database.`,
+    );
+  }
 }
 
 function normalizeSortTitle(title) {
@@ -50,7 +75,11 @@ const seedTitles = [
     genres: ["Action", "Science Fiction"],
     director: "Lana Wachowski, Lilly Wachowski",
     overview: "A hacker learns the world is a simulation and joins the resistance.",
-    cast: [cast("Keanu Reeves", "Neo"), cast("Laurence Fishburne", "Morpheus"), cast("Carrie-Anne Moss", "Trinity")],
+    cast: [
+      cast("Keanu Reeves", "Neo"),
+      cast("Laurence Fishburne", "Morpheus"),
+      cast("Carrie-Anne Moss", "Trinity"),
+    ],
     featured: true,
     hideFromHomepage: false,
   },
@@ -65,7 +94,11 @@ const seedTitles = [
     genres: ["Action", "Science Fiction"],
     director: "Lana Wachowski, Lilly Wachowski",
     overview: "Neo and the crew race to stop a machine uprising.",
-    cast: [cast("Keanu Reeves", "Neo"), cast("Laurence Fishburne", "Morpheus"), cast("Carrie-Anne Moss", "Trinity")],
+    cast: [
+      cast("Keanu Reeves", "Neo"),
+      cast("Laurence Fishburne", "Morpheus"),
+      cast("Carrie-Anne Moss", "Trinity"),
+    ],
     featured: false,
     hideFromHomepage: false,
   },
@@ -80,7 +113,11 @@ const seedTitles = [
     genres: ["Action", "Science Fiction"],
     director: "Lana Wachowski, Lilly Wachowski",
     overview: "The war for Zion reaches its final stage.",
-    cast: [cast("Keanu Reeves", "Neo"), cast("Laurence Fishburne", "Morpheus"), cast("Carrie-Anne Moss", "Trinity")],
+    cast: [
+      cast("Keanu Reeves", "Neo"),
+      cast("Laurence Fishburne", "Morpheus"),
+      cast("Carrie-Anne Moss", "Trinity"),
+    ],
     featured: false,
     hideFromHomepage: false,
   },
@@ -95,7 +132,11 @@ const seedTitles = [
     genres: ["Horror", "Science Fiction"],
     director: "Ridley Scott",
     overview: "A commercial crew encounters a hostile lifeform on a remote ship.",
-    cast: [cast("Sigourney Weaver", "Ripley"), cast("Tom Skerritt", "Dallas"), cast("Veronica Cartwright", "Lambert")],
+    cast: [
+      cast("Sigourney Weaver", "Ripley"),
+      cast("Tom Skerritt", "Dallas"),
+      cast("Veronica Cartwright", "Lambert"),
+    ],
     featured: true,
     hideFromHomepage: false,
   },
@@ -110,7 +151,11 @@ const seedTitles = [
     genres: ["Action", "Horror", "Science Fiction"],
     director: "James Cameron",
     overview: "Ripley returns to a colony where the alien threat has spread.",
-    cast: [cast("Sigourney Weaver", "Ripley"), cast("Michael Biehn", "Corporal Hicks"), cast("Carrie Henn", "Newt")],
+    cast: [
+      cast("Sigourney Weaver", "Ripley"),
+      cast("Michael Biehn", "Corporal Hicks"),
+      cast("Carrie Henn", "Newt"),
+    ],
     featured: false,
     hideFromHomepage: false,
   },
@@ -125,7 +170,11 @@ const seedTitles = [
     genres: ["Science Fiction", "Thriller"],
     director: "Ridley Scott",
     overview: "A blade runner hunts rogue replicants in a rain-soaked future city.",
-    cast: [cast("Harrison Ford", "Deckard"), cast("Rutger Hauer", "Roy Batty"), cast("Sean Young", "Rachael")],
+    cast: [
+      cast("Harrison Ford", "Deckard"),
+      cast("Rutger Hauer", "Roy Batty"),
+      cast("Sean Young", "Rachael"),
+    ],
     featured: true,
     hideFromHomepage: false,
   },
@@ -140,7 +189,11 @@ const seedTitles = [
     genres: ["Crime", "Drama"],
     director: "Vince Gilligan",
     overview: "A chemistry teacher turns to the drug trade after a terminal diagnosis.",
-    cast: [cast("Bryan Cranston", "Walter White"), cast("Aaron Paul", "Jesse Pinkman"), cast("Anna Gunn", "Skyler White")],
+    cast: [
+      cast("Bryan Cranston", "Walter White"),
+      cast("Aaron Paul", "Jesse Pinkman"),
+      cast("Anna Gunn", "Skyler White"),
+    ],
     featured: true,
     hideFromHomepage: false,
   },
@@ -155,7 +208,11 @@ const seedTitles = [
     genres: ["Comedy"],
     director: "Greg Daniels",
     overview: "A mockumentary about the daily life of a small office.",
-    cast: [cast("Steve Carell", "Michael Scott"), cast("Rainn Wilson", "Dwight Schrute"), cast("Jenna Fischer", "Pam Beesly")],
+    cast: [
+      cast("Steve Carell", "Michael Scott"),
+      cast("Rainn Wilson", "Dwight Schrute"),
+      cast("Jenna Fischer", "Pam Beesly"),
+    ],
     featured: false,
     hideFromHomepage: false,
   },
@@ -170,7 +227,11 @@ const seedTitles = [
     genres: ["Horror", "Science Fiction"],
     director: "John Carpenter",
     overview: "A remote research team is hunted by a shape-shifting organism.",
-    cast: [cast("Kurt Russell", "MacReady"), cast("Wilford Brimley", "Blair"), cast("Keith David", "Childs")],
+    cast: [
+      cast("Kurt Russell", "MacReady"),
+      cast("Wilford Brimley", "Blair"),
+      cast("Keith David", "Childs"),
+    ],
     featured: false,
     hideFromHomepage: true,
   },
@@ -185,7 +246,11 @@ const seedTitles = [
     genres: ["Crime", "Drama", "Thriller"],
     director: "Joel Coen, Ethan Coen",
     overview: "A botched crime in Minnesota spirals out of control.",
-    cast: [cast("Frances McDormand", "Marge Gunderson"), cast("William H. Macy", "Jerry Lundegaard"), cast("Steve Buscemi", "Carl Showalter")],
+    cast: [
+      cast("Frances McDormand", "Marge Gunderson"),
+      cast("William H. Macy", "Jerry Lundegaard"),
+      cast("Steve Buscemi", "Carl Showalter"),
+    ],
     featured: false,
     hideFromHomepage: false,
   },
@@ -372,6 +437,7 @@ const seedInventoryItems = [
 ];
 
 async function main() {
+  assertSafeSeedTarget();
   const pool = new Pool(getConnectionConfig());
 
   try {
@@ -454,8 +520,12 @@ async function main() {
             collection.tmdbCollectionId,
             collection.name,
             normalizeSortTitle(collection.name),
-            seedTitles.find((title) => title.tmdbId === collection.titles[0])?.title ?? collection.name,
-            normalizeSortTitle(seedTitles.find((title) => title.tmdbId === collection.titles[0])?.title ?? collection.name),
+            seedTitles.find((title) => title.tmdbId === collection.titles[0])?.title ??
+              collection.name,
+            normalizeSortTitle(
+              seedTitles.find((title) => title.tmdbId === collection.titles[0])?.title ??
+                collection.name,
+            ),
             seedTitles.find((title) => title.tmdbId === collection.titles[0])?.releaseDate ?? null,
             collection.overview,
             collection.posterPath,
@@ -559,10 +629,14 @@ async function main() {
         ...seedInventoryItems.map((item) => Number.parseInt(item.inventoryCode, 10)),
       );
 
-      await client.query(`SELECT setval('inventory_code_seq', $1::bigint, true)`, [maxInventoryCode]);
+      await client.query(`SELECT setval('inventory_code_seq', $1::bigint, true)`, [
+        maxInventoryCode,
+      ]);
 
       await client.query("COMMIT");
-      console.log(`Seeded ${seedTitles.length} titles and ${seedInventoryItems.length} inventory items`);
+      console.log(
+        `Seeded ${seedTitles.length} titles and ${seedInventoryItems.length} inventory items`,
+      );
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;

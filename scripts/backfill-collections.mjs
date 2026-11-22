@@ -116,7 +116,9 @@ async function upsertCollectionForTitle(client, collection) {
       collection.name,
       getSuggestedSortTitle(collection.name),
       anchorTitle?.title ?? collection.name,
-      anchorTitle ? getSuggestedSortTitle(anchorTitle.title) : getSuggestedSortTitle(collection.name),
+      anchorTitle
+        ? getSuggestedSortTitle(anchorTitle.title)
+        : getSuggestedSortTitle(collection.name),
       anchorTitle?.releaseDate || null,
       collection.overview,
       collection.posterPath,
@@ -142,9 +144,7 @@ async function upsertCollectionForTitle(client, collection) {
     [tmdbIds],
   );
 
-  const existingByTmdbId = new Map(
-    existingTitles.rows.map((row) => [row.tmdb_id, row.id]),
-  );
+  const existingByTmdbId = new Map(existingTitles.rows.map((row) => [row.tmdb_id, row.id]));
   const linkedTitleIds = [];
 
   for (const [index, title] of collection.titles.entries()) {
@@ -218,7 +218,10 @@ async function main() {
         continue;
       }
 
-      const collectionDetails = await fetchTmdbCollection(movie.belongs_to_collection.id, tmdbToken);
+      const collectionDetails = await fetchTmdbCollection(
+        movie.belongs_to_collection.id,
+        tmdbToken,
+      );
 
       if (!collectionDetails?.id || !collectionDetails?.name) {
         skipped += 1;
@@ -232,7 +235,8 @@ async function main() {
         tmdbId: String(collectionDetails.id),
         name: collectionDetails.name,
         overview: typeof collectionDetails.overview === "string" ? collectionDetails.overview : "",
-        posterPath: typeof collectionDetails.poster_path === "string" ? collectionDetails.poster_path : null,
+        posterPath:
+          typeof collectionDetails.poster_path === "string" ? collectionDetails.poster_path : null,
         titles: Array.isArray(collectionDetails.parts)
           ? collectionDetails.parts
               .slice()
@@ -255,7 +259,9 @@ async function main() {
         linkedTitles += backfillResult.linkedCount;
 
         if (verbose) {
-          console.log(`  Linked ${backfillResult.linkedCount} local title(s) into ${collection.name}`);
+          console.log(
+            `  Linked ${backfillResult.linkedCount} local title(s) into ${collection.name}`,
+          );
         }
       } catch (error) {
         await client.query("ROLLBACK");

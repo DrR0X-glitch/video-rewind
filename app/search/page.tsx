@@ -62,7 +62,9 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const filters = await getBrowseFilters();
   const genres = Array.isArray(filters?.genres) ? filters.genres : [];
   const initialPage =
-    typeof params.page === "string" && /^\d+$/.test(params.page) && Number.parseInt(params.page, 10) > 0
+    typeof params.page === "string" &&
+    /^\d+$/.test(params.page) &&
+    Number.parseInt(params.page, 10) > 0
       ? Number.parseInt(params.page, 10)
       : 1;
 
@@ -74,7 +76,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
       initialDecade={normalizeInitialDecade(params.decade)}
       initialGenre={params.genre ?? "all"}
       initialQuery={params.q?.trim() ?? ""}
-      initialSort={allowedSorts.has(params.sort ?? "") ? params.sort ?? "title" : "title"}
+      initialSort={allowedSorts.has(params.sort ?? "") ? (params.sort ?? "title") : "title"}
       initialPage={initialPage}
     />
   );

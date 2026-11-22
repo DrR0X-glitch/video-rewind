@@ -19,8 +19,7 @@ export function ThemeToggle() {
   }, []);
 
   function toggleTheme() {
-    const currentTheme =
-      document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+    const currentTheme = document.documentElement.dataset.theme === "dark" ? "dark" : "light";
     const nextTheme = currentTheme === "dark" ? "light" : "dark";
     applyTheme(nextTheme);
     window.localStorage.setItem(STORAGE_KEY, nextTheme);

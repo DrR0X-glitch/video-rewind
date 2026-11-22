@@ -7,9 +7,7 @@ import { fetchTmdbTitleDraft } from "@/lib/server/tmdb";
 export async function GET(request: NextRequest) {
   try {
     const input =
-      request.nextUrl.searchParams.get("url") ??
-      request.nextUrl.searchParams.get("id") ??
-      "";
+      request.nextUrl.searchParams.get("url") ?? request.nextUrl.searchParams.get("id") ?? "";
 
     const movie = await fetchTmdbTitleDraft(input);
     return NextResponse.json(movie);

@@ -70,8 +70,11 @@ export function PublicCatalogueClient({
   }, [query]);
 
   useEffect(() => {
-    const filterKey = [debouncedQuery.trim(), genre, decade, sort, availableOnly ? "1" : "0"].join("|");
-    const resetPage = previousFilterKeyRef.current !== "" && previousFilterKeyRef.current !== filterKey;
+    const filterKey = [debouncedQuery.trim(), genre, decade, sort, availableOnly ? "1" : "0"].join(
+      "|",
+    );
+    const resetPage =
+      previousFilterKeyRef.current !== "" && previousFilterKeyRef.current !== filterKey;
     previousFilterKeyRef.current = filterKey;
 
     const nextPage = resetPage ? 1 : currentPage;
@@ -101,7 +104,9 @@ export function PublicCatalogueClient({
       params.set("page", nextPage.toString());
     }
 
-    router.replace(params.toString() ? `${pathname}?${params.toString()}` : pathname, { scroll: false });
+    router.replace(params.toString() ? `${pathname}?${params.toString()}` : pathname, {
+      scroll: false,
+    });
   }, [availableOnly, currentPage, decade, debouncedQuery, genre, pathname, router, sort]);
 
   useEffect(() => {
@@ -184,11 +189,27 @@ export function PublicCatalogueClient({
   const pageEnd = totalCount === 0 ? 0 : pageStart + results.length - 1;
   const previousPageHref =
     currentPageOnResultSet > 1
-      ? buildCatalogueHref(pathname, debouncedQuery, genre, decade, sort, availableOnly, currentPageOnResultSet - 1)
+      ? buildCatalogueHref(
+          pathname,
+          debouncedQuery,
+          genre,
+          decade,
+          sort,
+          availableOnly,
+          currentPageOnResultSet - 1,
+        )
       : null;
   const nextPageHref =
     currentPageOnResultSet < totalPages
-      ? buildCatalogueHref(pathname, debouncedQuery, genre, decade, sort, availableOnly, currentPageOnResultSet + 1)
+      ? buildCatalogueHref(
+          pathname,
+          debouncedQuery,
+          genre,
+          decade,
+          sort,
+          availableOnly,
+          currentPageOnResultSet + 1,
+        )
       : null;
 
   return (
@@ -279,7 +300,11 @@ export function PublicCatalogueClient({
         <div className="section-heading">
           <h2>Results</h2>
           <p className="muted utility-row">
-            {isSearching ? "Searching…" : totalCount === 0 ? "0 matching titles" : `Showing ${pageStart}-${pageEnd} of ${totalCount}`}
+            {isSearching
+              ? "Searching…"
+              : totalCount === 0
+                ? "0 matching titles"
+                : `Showing ${pageStart}-${pageEnd} of ${totalCount}`}
           </p>
         </div>
         {searchError ? (
@@ -305,7 +330,9 @@ export function PublicCatalogueClient({
               ) : (
                 <span className="muted">Previous</span>
               )}
-              <span className="muted">Page {currentPageOnResultSet} of {totalPages}</span>
+              <span className="muted">
+                Page {currentPageOnResultSet} of {totalPages}
+              </span>
               {nextPageHref ? (
                 <Link href={nextPageHref}>Next</Link>
               ) : (

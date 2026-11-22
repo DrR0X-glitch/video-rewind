@@ -62,11 +62,16 @@ export function MovieRail({ title, description, movies }: MovieRailProps) {
     const firstItem = shell.querySelector<HTMLElement>(".movie-rail-item");
     const track = shell.querySelector<HTMLElement>(".movie-rail");
     const itemWidth = firstItem?.getBoundingClientRect().width ?? 0;
-    const gap = track ? Number.parseFloat(window.getComputedStyle(track).columnGap || window.getComputedStyle(track).gap || "0") : 0;
-    const itemsPerView = Number.parseInt(
-      window.getComputedStyle(shell).getPropertyValue("--items-per-view").trim(),
-      10,
-    ) || 6;
+    const gap = track
+      ? Number.parseFloat(
+          window.getComputedStyle(track).columnGap || window.getComputedStyle(track).gap || "0",
+        )
+      : 0;
+    const itemsPerView =
+      Number.parseInt(
+        window.getComputedStyle(shell).getPropertyValue("--items-per-view").trim(),
+        10,
+      ) || 6;
     const advanceCount = Math.max(1, itemsPerView - 2);
     const distance = (itemWidth + gap) * advanceCount;
 
@@ -102,10 +107,7 @@ export function MovieRail({ title, description, movies }: MovieRailProps) {
           </button>
         </div>
       </div>
-      <div
-        ref={shellRef}
-        className="movie-rail-shell"
-      >
+      <div ref={shellRef} className="movie-rail-shell">
         <div className="movie-rail" aria-label={title}>
           {movies.map((movie) => (
             <div key={movie.id} className="movie-rail-item">

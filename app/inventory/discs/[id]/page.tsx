@@ -19,9 +19,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export default async function InventoryDiscPage(
-  props: PageProps<"/inventory/discs/[id]">,
-) {
+export default async function InventoryDiscPage(props: PageProps<"/inventory/discs/[id]">) {
   const { id } = await props.params;
   const search = await props.searchParams;
   const disc = await getInventoryItemById(id);
@@ -49,7 +47,7 @@ export default async function InventoryDiscPage(
       <div className="two-column">
         <section className="panel section">
           <h2>Titles On Disc</h2>
-            <ul className="plain-list plain-actions">
+          <ul className="plain-list plain-actions">
             {disc.linkedTitles.map((title) => (
               <li key={title.id}>
                 <span>{formatLinkedTitleLabel(title)}</span>
@@ -60,7 +58,9 @@ export default async function InventoryDiscPage(
           </ul>
           <p className="muted">Location code: {disc.locationCode}</p>
           <p className="muted">Current location: {formatInventoryLocation(disc)}</p>
-          <p className="muted">Last edited: {disc.updatedAt ? formatDateTime(disc.updatedAt) : "Unknown"}</p>
+          <p className="muted">
+            Last edited: {disc.updatedAt ? formatDateTime(disc.updatedAt) : "Unknown"}
+          </p>
           <div className="barcode-panel">
             <BarcodeSvg value={disc.inventoryCode} />
             <div className="utility-row header-actions">
@@ -107,13 +107,23 @@ export default async function InventoryDiscPage(
 
             <div className="inline-split">
               <label className="checkbox-row">
-                <input type="checkbox" name="availability" value="true" defaultChecked={disc.availability} />
+                <input
+                  type="checkbox"
+                  name="availability"
+                  value="true"
+                  defaultChecked={disc.availability}
+                />
                 <span className={`status-pill status-${getAvailabilityTone(disc.availability)}`}>
                   {formatAvailability(disc.availability)}
                 </span>
               </label>
               <label className="checkbox-row">
-                <input type="checkbox" name="reviewed" value="true" defaultChecked={disc.reviewed} />
+                <input
+                  type="checkbox"
+                  name="reviewed"
+                  value="true"
+                  defaultChecked={disc.reviewed}
+                />
                 <span className={`status-pill status-${disc.reviewed ? "good" : "warn"}`}>
                   {disc.reviewed ? "Reviewed" : "Needs review"}
                 </span>

@@ -3,7 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { bulkUpdateMoviesInDatabase, deleteMovieFromDatabase, updateMovieInDatabase } from "@/lib/server/store";
+import {
+  bulkUpdateMoviesInDatabase,
+  deleteMovieFromDatabase,
+  updateMovieInDatabase,
+} from "@/lib/server/store";
 
 function getString(formData: FormData, key: string) {
   const value = formData.get(key);
