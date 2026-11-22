@@ -46,6 +46,7 @@ export type InventoryItem = {
   reviewed: boolean;
   sealed: boolean;
   zone: string;
+  zoneLabel?: string;
   section: string;
   row: string;
   locationCode: string;

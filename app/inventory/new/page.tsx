@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { InventoryNewFlow } from "@/app/inventory/new/inventory-new-flow";
 import { getMovieById, getSuggestedSortTitle, getTmdbMovieDraft } from "@/lib/data";
+import { listInventoryZones } from "@/lib/server/inventory/zones";
 import { findDuplicateMovieForDraft } from "@/lib/server/store";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +18,7 @@ type InventoryNewPageProps = {
 
 export default async function InventoryNewPage({ searchParams }: InventoryNewPageProps) {
   const params = await searchParams;
+  const zones = await listInventoryZones({ activeOnly: true });
   const selectedIds = (params.selected ?? "")
     .split(",")
     .map((value) => value.trim())
@@ -58,6 +60,8 @@ export default async function InventoryNewPage({ searchParams }: InventoryNewPag
       <InventoryNewFlow
         key={`${params.selected ?? ""}|${params.tmdb ?? ""}|${title}|${suggestedSortTitle}`}
         initialSelectedMovies={selectedMovies}
+        zones={zones}
+        defaultZone={zones.find((zone) => zone.code === "W")?.code ?? zones[0]?.code ?? "W"}
         duplicateMovie={duplicateMovie}
         suggestedSortTitle={suggestedSortTitle}
         title={title}

@@ -2,7 +2,8 @@ import { BarcodeSvg } from "@/components/barcode-svg";
 import Link from "next/link";
 
 import { updateDisc } from "@/app/inventory/discs/[id]/actions";
-import { ZONE_OPTIONS, formatZoneLabel } from "@/lib/constants";
+import { formatZoneLabel } from "@/lib/constants";
+import { listInventoryZones } from "@/lib/server/inventory/zones";
 import { getInventoryItemById } from "@/lib/server/store";
 import {
   formatDateTime,
@@ -23,6 +24,7 @@ export default async function InventoryDiscPage(props: PageProps<"/inventory/dis
   const { id } = await props.params;
   const search = await props.searchParams;
   const disc = await getInventoryItemById(id);
+  const zones = await listInventoryZones({ activeOnly: true, includeCode: disc.zone });
   const primaryTitle = disc.linkedTitles[0];
   const returnTo = typeof search.returnTo === "string" ? search.returnTo : "";
 
@@ -87,9 +89,10 @@ export default async function InventoryDiscPage(props: PageProps<"/inventory/dis
             <label>
               Zone
               <select name="zone" defaultValue={disc.zone}>
-                {ZONE_OPTIONS.map((zone) => (
-                  <option key={zone} value={zone}>
-                    {formatZoneLabel(zone)}
+                {zones.map((zone) => (
+                  <option key={zone.code} value={zone.code}>
+                    {formatZoneLabel(zone.code, zones)}
+                    {!zone.isActive ? " (inactive)" : ""}
                   </option>
                 ))}
               </select>

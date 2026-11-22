@@ -2,13 +2,15 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
-import { ZONE_OPTIONS, formatZoneLabel } from "@/lib/constants";
+import { formatZoneLabel } from "@/lib/constants";
+import type { InventoryZone } from "@/lib/inventory-zones";
 
 type StockBulkControlsProps = {
   allMatchingIds: string[];
+  zones: InventoryZone[];
 };
 
-export function StockBulkControls({ allMatchingIds }: StockBulkControlsProps) {
+export function StockBulkControls({ allMatchingIds, zones }: StockBulkControlsProps) {
   const dialogRef = useRef<HTMLDialogElement | null>(null);
   const [applyAvailability, setApplyAvailability] = useState(false);
   const [applyReviewed, setApplyReviewed] = useState(false);
@@ -144,10 +146,10 @@ export function StockBulkControls({ allMatchingIds }: StockBulkControlsProps) {
               </label>
               <label>
                 Zone
-                <select name="zoneValue" defaultValue="W" disabled={!applyZone}>
-                  {ZONE_OPTIONS.map((zone) => (
-                    <option key={zone} value={zone}>
-                      {formatZoneLabel(zone)}
+                <select name="zoneValue" disabled={!applyZone}>
+                  {zones.map((zone) => (
+                    <option key={zone.code} value={zone.code}>
+                      {formatZoneLabel(zone.code, zones)}
                     </option>
                   ))}
                 </select>
