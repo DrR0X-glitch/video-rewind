@@ -13,6 +13,8 @@ type InventoryNewPageProps = {
     tmdb?: string;
     title?: string;
     sortTitle?: string;
+    customError?: string;
+    customDuplicate?: string;
   }>;
 };
 
@@ -67,6 +69,8 @@ export default async function InventoryNewPage({ searchParams }: InventoryNewPag
         title={title}
         tmdbDraft={tmdbDraft}
         tmdbInput={params.tmdb ?? ""}
+        customTitleError={params.customError ?? ""}
+        customTitleDuplicate={params.customDuplicate === "1"}
       />
 
       <p className="utility-row">

@@ -72,13 +72,13 @@ For future schema changes, add a new numbered SQL file under `db/migrations/` an
 
 ### Local database tests
 
-There is one Compose PostgreSQL service for development. `pnpm db:reset:dev` validates and records the current baseline when it finds the existing schema without migration history; it applies the baseline SQL only to an empty database. It then reseeds the development fixtures. Database integration tests use the same local `dvd_store` database to check schema and seed state and briefly create a uniquely coded zone to exercise zone management; the test removes that zone afterward. After preparing the database, run:
+There is one Compose PostgreSQL service for development. `pnpm db:reset:dev` validates and records the current baseline when it finds the existing schema without migration history; it applies the baseline SQL only to an empty database. It then reseeds the development fixtures. Database integration tests use the same local `dvd_store` database to check schema and seed state, create and remove a uniquely coded zone, and create and remove a uniquely named manual title. After preparing the database, run:
 
 ```bash
 pnpm test:database
 ```
 
-The integration suite is read-only. The explicit reset command replaces local catalogue and inventory data with fixtures; do not use it if you need to keep local edits.
+The database checks create and remove uniquely named test records; they leave the seeded fixture data intact. The explicit reset command replaces local catalogue and inventory data with fixtures, so do not use it if you need to keep local edits.
 
 For LAN testing in production mode without dev websocket issues:
 
