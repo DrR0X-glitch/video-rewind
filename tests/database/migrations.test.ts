@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { readFile } from "node:fs/promises";
 
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -54,6 +55,7 @@ describe("local PostgreSQL setup", () => {
       "0003_custom_titles.sql",
       "0004_inventory_upc_ean.sql",
       "0005_required_title_year.sql",
+      "0006_vhs_inventory_format.sql",
     ]);
     expect(result.rows.every((row) => /^[a-f0-9]{64}$/.test(row.checksum))).toBe(true);
   });
@@ -93,6 +95,77 @@ describe("local PostgreSQL setup", () => {
         (SELECT COUNT(*) FROM titles WHERE BTRIM(sort_title) = '') AS invalid_titles
     `);
     expect(result.rows[0]).toEqual({ year_nullable: "NO", year_count: "0", invalid_titles: "0" });
+  });
+
+  it("allows the explicit year-one placeholder for legacy titles without a date", async () => {
+    const client = await pool!.connect();
+    try {
+      await client.query("BEGIN");
+      const result = await client.query<{ release_year: number; release_date: string }>(
+        `
+          INSERT INTO titles (
+            tmdb_id, media_type, title, sort_title, release_year, release_date, metadata_source
+          )
+          VALUES (NULL, 'movie', 'Legacy year placeholder', 'Legacy year placeholder', 1, DATE '0001-01-01', 'manual')
+          RETURNING release_year, release_date::TEXT;
+        `,
+      );
+      expect(result.rows[0]).toEqual({ release_year: 1, release_date: "0001-01-01" });
+      await client.query("ROLLBACK");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  });
+
+  it("backfills legacy title years from dates and marks missing dates with year one", async () => {
+    const client = await pool!.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(`
+        CREATE TEMP TABLE titles (
+          title TEXT NOT NULL,
+          sort_title TEXT NOT NULL,
+          release_date DATE
+        );
+        INSERT INTO titles (title, sort_title, release_date)
+        VALUES ('Known year', '', DATE '1982-06-25'), ('Unknown year', 'Unknown year', NULL);
+      `);
+      const migration = await readFile(
+        new URL("../../db/migrations/0005_required_title_year.sql", import.meta.url),
+        "utf8",
+      );
+      await client.query(migration);
+      const rows = await client.query<{
+        title: string;
+        sort_title: string;
+        release_year: number;
+        release_date: string;
+      }>(`
+        SELECT title, sort_title, release_year, release_date::TEXT
+        FROM titles
+        ORDER BY title;
+      `);
+      expect(rows.rows).toEqual([
+        {
+          title: "Known year",
+          sort_title: "Known year",
+          release_year: 1982,
+          release_date: "1982-06-25",
+        },
+        {
+          title: "Unknown year",
+          sort_title: "Unknown year",
+          release_year: 1,
+          release_date: "0001-01-01",
+        },
+      ]);
+    } finally {
+      await client.query("ROLLBACK");
+      client.release();
+    }
   });
 
   it("stores UPC/EAN values on inventory copies without requiring uniqueness", async () => {

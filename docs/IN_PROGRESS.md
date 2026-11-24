@@ -10,10 +10,12 @@ Live register of work currently in progress or waiting in the backlog. Remove co
 
 ## Backlog
 
-| ID      | Task                        | Notes                                                                                                                                    |
-| ------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| DVD-007 | Expand domain test coverage | Add focused server, database, and browser tests as each product domain is implemented or substantially changed.                          |
-| DVD-008 | Prepare deployment cutover  | Keep deployment on hold until the roadmap is complete and staff authentication is ready; rehearse migration and recovery before cutover. |
+| ID      | Task                                    | Notes                                                                                                                                                                                 |
+| ------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| DVD-007 | Expand domain test coverage             | Add focused server, database, and browser tests as each product domain is implemented or substantially changed.                                                                       |
+| DVD-008 | Prepare deployment cutover              | Keep deployment on hold until the roadmap is complete and staff authentication is ready; rehearse migration and recovery before cutover.                                              |
+| DVD-014 | Add staff-only CD catalog with Discogs  | Use a separate provider and release model; store one compact searchable track list per Discogs release, shared by duplicate physical copies, and define refresh/attribution behavior. |
+| DVD-017 | Extract catalog and stock read services | Move the title visibility and stock projection queries touched by format support from `lib/server/store.ts` into catalog/inventory query services.                                    |
 
 ## Register rules
 

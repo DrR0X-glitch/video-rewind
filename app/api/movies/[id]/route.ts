@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import {
   deleteMovieFromDatabase,
-  getMovieFromDatabase,
+  getPublicMovieDetailFromDatabase,
   updateMovieInDatabase,
 } from "@/lib/server/store";
 import { ensureObject, jsonError } from "@/lib/server/http";
@@ -10,7 +10,7 @@ import { ensureObject, jsonError } from "@/lib/server/http";
 export async function GET(_request: Request, context: RouteContext<"/api/movies/[id]">) {
   try {
     const { id } = await context.params;
-    const movie = await getMovieFromDatabase(id);
+    const movie = await getPublicMovieDetailFromDatabase(id);
     return NextResponse.json(movie);
   } catch (error) {
     return jsonError(error);

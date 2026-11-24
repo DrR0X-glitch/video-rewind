@@ -126,12 +126,14 @@ export default async function MovieDetailPage(props: PageProps<"/movies/[id]">) 
   );
 }
 
-function getFormatPriority(format: "dvd" | "blu-ray" | "4k-uhd") {
+function getFormatPriority(format: "dvd" | "blu-ray" | "4k-uhd" | "vhs") {
   switch (format) {
     case "4k-uhd":
       return 0;
     case "blu-ray":
       return 1;
+    case "vhs":
+      return 3;
     default:
       return 2;
   }

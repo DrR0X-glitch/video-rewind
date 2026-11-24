@@ -51,6 +51,11 @@ Make inventory faster and more reliable before relying on it for checkout.
 - Provide a guided stock-move workflow that records the old and new location, affected items, staff member, time, and any exceptions. Avoid silently changing location history.
 - As location and stock-move work begins, move the affected stock queries and mutations out of `lib/server/store.ts` into inventory/location services; keep this extraction within the feature task.
 - Keep the existing inventory-code and title/disc distinction intact unless discovery shows a business need to change it.
+- Add VHS as a staff-managed inventory format backed by existing TMDB movie/series metadata; VHS-only stock must not create a public catalogue listing.
+- Add compact poster/artwork thumbnails to staff stock rows using linked title artwork.
+- Treat CDs as a separate staff-only catalogue workstream. Keep Discogs behind a server-side provider boundary and model one release record per Discogs release; link each physical CD copy to that record so duplicate copies do not duplicate release metadata or tracks.
+- Store a compact track list per Discogs release (position, title, and duration) for staff track search and release pages. Avoid copying full Discogs payloads or per-track credits. Define refresh behavior, attribution, rate-limit handling, and upstream failure fallback before implementation; Discogs' [API terms](https://support.discogs.com/hc/en-us/articles/360009334593-API-Terms-of-Use) classify track listings as CC0 while also applying freshness and caching rules to API content.
+- See the [CD catalog plan](./CD_CATALOG_PLAN.md) for the proposed tables, storage estimate, refresh constraints, and phased staff workflow.
 
 ### 3. Staff identity and security controls
 

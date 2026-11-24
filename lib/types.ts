@@ -1,4 +1,4 @@
-export type DiscFormat = "dvd" | "blu-ray" | "4k-uhd";
+export type DiscFormat = "dvd" | "blu-ray" | "4k-uhd" | "vhs";
 export type MediaType = "movie" | "series";
 
 export type Movie = {
@@ -28,6 +28,7 @@ export type LinkedTitle = {
   mediaType: MediaType;
   releaseDate: string;
   releaseYear: number;
+  posterUrl?: string | null;
   seasonStart?: number;
   seasonEnd?: number;
   episodeStart?: number;

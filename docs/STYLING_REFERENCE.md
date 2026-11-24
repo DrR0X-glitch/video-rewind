@@ -285,3 +285,5 @@ Quietly modernize through consistent spacing, not decorative surfaces.
 ## Philosophy
 
 Looks nostalgic, behaves modern, stays lean.
+
+Stock-view linked titles may show a compact 36 × 54 px poster beside the title. Preserve its aspect ratio; show a small neutral “No art” box when no image is available.

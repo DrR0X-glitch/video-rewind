@@ -79,6 +79,7 @@ export default async function InventoryDiscPage(props: PageProps<"/inventory/dis
                 <option value="dvd">{formatDiscFormat("dvd")}</option>
                 <option value="blu-ray">{formatDiscFormat("blu-ray")}</option>
                 <option value="4k-uhd">{formatDiscFormat("4k-uhd")}</option>
+                <option value="vhs">{formatDiscFormat("vhs")}</option>
               </select>
             </label>
 

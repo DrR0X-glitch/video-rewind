@@ -25,6 +25,13 @@ This follows the purpose-prefix and lowercase kebab-case approach in [Convention
 7. Run the full verification gate again on `main` after the merge. No CI is configured or required by this workflow.
 8. Remove the completed task from `docs/IN_PROGRESS.md` before the commit that completes it; record remaining work as separate active or backlog items.
 
+## Migration lifecycle
+
+- A numbered migration may be edited while its feature branch is still unmerged to `main`.
+- If an edited migration was applied to a local development database, reset and reseed only that local database before applying it again.
+- Once a branch containing a migration is merged to `main`, treat that migration as already applied in production. Never edit it after merge; add a new numbered migration for later changes.
+- Never reset a production database. Production upgrades run forward through migrations while preserving its data.
+
 ## Local verification gate
 
 Run these before every merge to `main`:

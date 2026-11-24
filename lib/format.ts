@@ -3,11 +3,13 @@ import { formatZoneLabel } from "@/lib/constants";
 
 export function formatReleaseYear(date: string | number): string {
   if (typeof date === "number") {
-    return Number.isInteger(date) ? date.toString() : "Unknown";
+    return Number.isInteger(date) ? date.toString().padStart(4, "0") : "Unknown";
   }
   if (/^\d{4}$/.test(date)) return date;
   const parsed = new Date(date);
-  return Number.isNaN(parsed.getTime()) ? "Unknown" : parsed.getFullYear().toString();
+  return Number.isNaN(parsed.getTime())
+    ? "Unknown"
+    : parsed.getFullYear().toString().padStart(4, "0");
 }
 
 export function formatLongDate(date: string): string {
@@ -116,6 +118,8 @@ export function formatDiscFormat(format: DiscFormat): string {
       return "Blu-ray";
     case "4k-uhd":
       return "4K UHD";
+    case "vhs":
+      return "VHS";
     default:
       return "DVD";
   }

@@ -199,6 +199,7 @@ export async function createInventoryItemInDatabase(body: Record<string, unknown
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock(724061, 2)");
     const inventoryCode = await allocateLowestInventoryCode(client);
     const inventoryResult = await client.query<{ id: string; inventory_code: string }>(
       `

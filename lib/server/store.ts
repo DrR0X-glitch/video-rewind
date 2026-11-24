@@ -39,6 +39,7 @@ type MovieFilters = {
   decade?: number | "pre-1950" | null;
   available?: boolean;
   reviewedOnly?: boolean;
+  publicOnly?: boolean;
   mediaType?: "movie" | "series";
   excludeHomepageHidden?: boolean;
   limit?: number;
@@ -53,6 +54,8 @@ const TITLE_SEARCH_VECTOR_SQL = `
     setweight(to_tsvector('simple', COALESCE(t.sort_title, '')), 'A')
   )
 `;
+
+const PUBLIC_FORMATS_SQL = "i.format IN ('dvd', 'blu-ray', '4k-uhd')";
 
 const TITLE_METADATA_SEARCH_VECTOR_SQL = `
   (
@@ -152,6 +155,7 @@ type InventoryItemRow = {
     media_type: "movie" | "series";
     release_date: string | Date | null;
     release_year: number;
+    poster_path?: string | null;
     season_start?: number | null;
     season_end?: number | null;
     episode_start?: number | null;
@@ -191,7 +195,7 @@ function getSuggestedSortTitle(title: string) {
 }
 
 function getFormatPrioritySql(column: string) {
-  return `(CASE ${column}::text WHEN '4k-uhd' THEN 0 WHEN 'blu-ray' THEN 1 ELSE 2 END)`;
+  return `(CASE ${column}::text WHEN '4k-uhd' THEN 0 WHEN 'blu-ray' THEN 1 WHEN 'dvd' THEN 2 ELSE 3 END)`;
 }
 
 function getPosterColor(title: string) {
@@ -207,6 +211,7 @@ function toUiLinkedTitle(title: {
   media_type: "movie" | "series";
   release_date: string | Date | null;
   release_year: number;
+  poster_path?: string | null;
   season_start?: number | null;
   season_end?: number | null;
   episode_start?: number | null;
@@ -219,6 +224,7 @@ function toUiLinkedTitle(title: {
     mediaType: title.media_type,
     releaseDate: formatDateOnly(title.release_date) ?? "",
     releaseYear: Number(title.release_year),
+    posterUrl: formatPosterUrl(title.poster_path ?? null, "list"),
     seasonStart: typeof title.season_start === "number" ? title.season_start : undefined,
     seasonEnd: typeof title.season_end === "number" ? title.season_end : undefined,
     episodeStart: typeof title.episode_start === "number" ? title.episode_start : undefined,
@@ -236,7 +242,9 @@ function toUiInventoryItem(item: InventoryItemRow): InventoryItem {
         ? "blu-ray"
         : item.format.toLowerCase() === "4k-uhd"
           ? "4k-uhd"
-          : "dvd",
+          : item.format.toLowerCase() === "vhs"
+            ? "vhs"
+            : "dvd",
     sealed: Boolean(item.sealed),
     availability: item.availability,
     reviewed: item.reviewed,
@@ -477,6 +485,7 @@ function buildListTitlesQuery(filters: MovieFilters) {
       FROM titles t
       LEFT JOIN inventory_item_titles itt ON itt.title_id = t.id
       LEFT JOIN inventory_items i ON i.id = itt.inventory_item_id
+        ${filters.publicOnly ? `AND ${PUBLIC_FORMATS_SQL}` : ""}
       ${whereClause}
       GROUP BY t.id
       ${
@@ -495,8 +504,12 @@ function buildListTitlesQuery(filters: MovieFilters) {
   };
 }
 
-async function getInventoryItemsForTitle(titleId: string, options?: { reviewedOnly?: boolean }) {
+async function getInventoryItemsForTitle(
+  titleId: string,
+  options?: { reviewedOnly?: boolean; publicOnly?: boolean },
+) {
   const reviewedClause = options?.reviewedOnly ? "AND i.reviewed = TRUE" : "";
+  const publicFormatClause = options?.publicOnly ? `AND ${PUBLIC_FORMATS_SQL}` : "";
   const result = await pool.query<InventoryItemRow>(
     `
       SELECT
@@ -527,6 +540,7 @@ async function getInventoryItemsForTitle(titleId: string, options?: { reviewedOn
               'media_type', t2.media_type::text,
               'release_date', t2.release_date,
               'release_year', t2.release_year,
+              'poster_path', t2.poster_path,
               'season_start', itt2.season_start,
               'season_end', itt2.season_end,
               'episode_start', itt2.episode_start,
@@ -542,6 +556,7 @@ async function getInventoryItemsForTitle(titleId: string, options?: { reviewedOn
       LEFT JOIN titles t2 ON t2.id = itt2.title_id
       WHERE itt.title_id = $1
       ${reviewedClause}
+      ${publicFormatClause}
       GROUP BY i.id
       ORDER BY i.created_at ASC;
     `,
@@ -564,7 +579,7 @@ function toUiStockDisc(item: StockDiscRow): StockViewDisc {
 
 async function getCollectionDataForTitle(
   titleId: string,
-  options?: { reviewedOnly?: boolean },
+  options?: { reviewedOnly?: boolean; publicOnly?: boolean },
 ): Promise<{
   collection?: TitleCollection;
   collectionTitles: LinkedTitle[];
@@ -577,6 +592,7 @@ async function getCollectionDataForTitle(
         INNER JOIN inventory_items visible_i ON visible_i.id = visible_itt.inventory_item_id
         WHERE visible_itt.title_id = t.id
           AND visible_i.reviewed = TRUE
+          ${options?.publicOnly ? `AND ${PUBLIC_FORMATS_SQL.replaceAll("i.", "visible_i.")}` : ""}
       )
     `
     : "";
@@ -660,6 +676,7 @@ export async function getInventoryItemById(id: string) {
               'media_type', t.media_type::text,
               'release_date', t.release_date,
               'release_year', t.release_year,
+              'poster_path', t.poster_path,
               'season_start', itt.season_start,
               'season_end', itt.season_end,
               'episode_start', itt.episode_start,
@@ -703,6 +720,7 @@ export async function getMovieFiltersFromDatabase(): Promise<{
       INNER JOIN inventory_item_titles itt ON itt.title_id = t.id
       INNER JOIN inventory_items i ON i.id = itt.inventory_item_id
       WHERE i.reviewed = TRUE
+        AND ${PUBLIC_FORMATS_SQL}
     `,
   );
 
@@ -830,6 +848,7 @@ export async function listBrowseMoviesFromDatabase(filters: {
         : null,
     available: filters.available === "true",
     reviewedOnly: true,
+    publicOnly: true,
     limit: filters.limit,
     sort:
       filters.sort === "rating-desc" ||
@@ -871,6 +890,7 @@ export async function listBrowseMoviesPageFromDatabase(filters: {
         : null,
     available: filters.available === "true",
     reviewedOnly: true,
+    publicOnly: true,
     limit: filters.limit,
     page: filters.page,
     pageSize: filters.pageSize,
@@ -904,6 +924,7 @@ export async function getTopGenresFromDatabase(
         CROSS JOIN LATERAL UNNEST(t.genres) AS genre
         WHERE genre <> ''
           AND i.reviewed = TRUE
+          AND ${PUBLIC_FORMATS_SQL}
           ${options?.excludeHomepageHidden ? "AND t.hide_from_homepage = FALSE" : ""}
         GROUP BY genre
       ) ranked_genres
@@ -976,7 +997,7 @@ export async function getPublicMovieDetailFromDatabase(id: string) {
         COUNT(DISTINCT i.id) FILTER (WHERE i.reviewed = TRUE AND i.availability = TRUE)::INT AS available_count
       FROM titles t
       LEFT JOIN inventory_item_titles itt ON itt.title_id = t.id
-      LEFT JOIN inventory_items i ON i.id = itt.inventory_item_id
+      LEFT JOIN inventory_items i ON i.id = itt.inventory_item_id AND ${PUBLIC_FORMATS_SQL}
       WHERE t.id = $1
       GROUP BY t.id
       HAVING COUNT(DISTINCT i.id) FILTER (WHERE i.reviewed = TRUE) > 0;
@@ -990,8 +1011,14 @@ export async function getPublicMovieDetailFromDatabase(id: string) {
     throw createHttpError(404, "Title not found");
   }
 
-  const inventoryItems = await getInventoryItemsForTitle(id, { reviewedOnly: true });
-  const collectionData = await getCollectionDataForTitle(id, { reviewedOnly: true });
+  const inventoryItems = await getInventoryItemsForTitle(id, {
+    reviewedOnly: true,
+    publicOnly: true,
+  });
+  const collectionData = await getCollectionDataForTitle(id, {
+    reviewedOnly: true,
+    publicOnly: true,
+  });
 
   return {
     ...toUiTitle(title, inventoryItems),
@@ -1077,7 +1104,7 @@ export async function getFeaturedMoviesFromDatabase() {
         COUNT(DISTINCT i.id) FILTER (WHERE i.reviewed = TRUE AND i.availability = TRUE)::INT AS available_count
       FROM titles t
       LEFT JOIN inventory_item_titles itt ON itt.title_id = t.id
-      LEFT JOIN inventory_items i ON i.id = itt.inventory_item_id
+      LEFT JOIN inventory_items i ON i.id = itt.inventory_item_id AND ${PUBLIC_FORMATS_SQL}
       WHERE t.featured = TRUE
         AND t.hide_from_homepage = FALSE
       GROUP BY t.id
@@ -1115,6 +1142,7 @@ export async function getRecentlyReturnedMoviesFromDatabase(limit = 6) {
       INNER JOIN inventory_item_titles itt ON itt.title_id = t.id
       INNER JOIN inventory_items i ON i.id = itt.inventory_item_id
       WHERE i.last_rented_at IS NOT NULL
+        AND ${PUBLIC_FORMATS_SQL}
         AND i.reviewed = TRUE
         AND t.hide_from_homepage = FALSE
       GROUP BY t.id
@@ -1475,6 +1503,7 @@ export async function getAlphabeticalStockSectionsFromDatabase(input: {
               'media_type', t.media_type::text,
               'release_date', t.release_date,
               'release_year', t.release_year,
+              'poster_path', t.poster_path,
               'season_start', itt.season_start,
               'season_end', itt.season_end,
               'episode_start', itt.episode_start,
@@ -1857,6 +1886,7 @@ export async function listStockDiscsFromDatabase(input: {
               'media_type', t.media_type::text,
               'release_date', t.release_date,
               'release_year', t.release_year,
+              'poster_path', t.poster_path,
               'season_start', itt.season_start,
               'season_end', itt.season_end,
               'episode_start', itt.episode_start,

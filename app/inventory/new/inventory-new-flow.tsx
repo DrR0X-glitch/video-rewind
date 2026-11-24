@@ -24,7 +24,7 @@ const SELECTED_TITLE_GRID_LIMIT = 6;
 
 type DiscDraft = {
   availability: boolean;
-  format: "dvd" | "blu-ray" | "4k-uhd";
+  format: "dvd" | "blu-ray" | "4k-uhd" | "vhs";
   sealed: boolean;
   zone: string;
   row: string;
@@ -129,7 +129,8 @@ export function InventoryNewFlow({
           format:
             parsedDefaults.format === "dvd" ||
             parsedDefaults.format === "4k-uhd" ||
-            parsedDefaults.format === "blu-ray"
+            parsedDefaults.format === "blu-ray" ||
+            parsedDefaults.format === "vhs"
               ? parsedDefaults.format
               : DEFAULT_DISC_DRAFT.format,
           sealed:
@@ -773,6 +774,16 @@ function DiscFields({
               }
             />
             <span>4K UHD</span>
+          </label>
+          <label className="choice-button">
+            <input
+              type="radio"
+              name="format"
+              value="vhs"
+              checked={discDraft.format === "vhs"}
+              onChange={() => setDiscDraft((currentDraft) => ({ ...currentDraft, format: "vhs" }))}
+            />
+            <span>VHS</span>
           </label>
         </span>
       </label>

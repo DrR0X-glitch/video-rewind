@@ -96,7 +96,7 @@ export function normalizeSealed(value: unknown, fieldName = "sealed") {
 
 export function normalizeFormat(value: unknown) {
   const normalizedValue = normalizeEnumValue(value, "format");
-  const allowedFormats = new Set(["dvd", "blu-ray", "4k-uhd"]);
+  const allowedFormats = new Set(["dvd", "blu-ray", "4k-uhd", "vhs"]);
 
   if (!allowedFormats.has(normalizedValue)) {
     throw createHttpError(400, 'Field "format" is invalid');

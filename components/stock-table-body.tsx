@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 
 import {
@@ -165,13 +166,21 @@ export function StockTableBody({
               <div className="stock-title-list">
                 {item.linkedTitles.map((title) =>
                   titleDisplayMode === "review" ? (
-                    <span key={title.id}>
-                      <strong>{formatLinkedTitleLabel(title)}</strong>
-                      <br />
-                      <span className="muted">{title.sortTitle}</span>
+                    <span className="stock-title-entry" key={title.id}>
+                      <StockTitleArt posterUrl={title.posterUrl} />
+                      <span className="stock-title-entry-text">
+                        <strong>{formatLinkedTitleLabel(title)}</strong>
+                        <br />
+                        <span className="muted">{title.sortTitle}</span>
+                      </span>
                     </span>
                   ) : (
-                    <span key={title.id}>{formatLinkedTitleLabel(title)}</span>
+                    <span className="stock-title-entry" key={title.id}>
+                      <StockTitleArt posterUrl={title.posterUrl} />
+                      <span className="stock-title-entry-text">
+                        {formatLinkedTitleLabel(title)}
+                      </span>
+                    </span>
                   ),
                 )}
               </div>
@@ -215,5 +224,27 @@ export function StockTableBody({
         </tr>
       ))}
     </tbody>
+  );
+}
+
+function StockTitleArt({ posterUrl }: { posterUrl?: string | null }) {
+  if (!posterUrl) {
+    return (
+      <span className="stock-title-art-placeholder" aria-hidden="true">
+        No art
+      </span>
+    );
+  }
+
+  return (
+    <Image
+      className="stock-title-art"
+      src={posterUrl}
+      alt=""
+      width={36}
+      height={54}
+      sizes="36px"
+      loading="lazy"
+    />
   );
 }

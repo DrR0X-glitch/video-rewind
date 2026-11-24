@@ -68,7 +68,7 @@ The normal migration command will not replay the baseline against a database tha
 pnpm db:migrate:baseline
 ```
 
-For future schema changes, add a new numbered SQL file under `db/migrations/` and run `pnpm db:migrate`. Never edit a migration after it has been applied; add another migration instead.
+For future schema changes, add a new numbered SQL file under `db/migrations/` and run `pnpm db:migrate`. A migration may be revised while its branch is unmerged to `main`; reset and reseed affected local development databases so they apply the revised file from scratch. After merge, treat the migration as applied in production: never edit it, and add a new migration for later changes. Never reset a production database.
 
 ### Local database tests
 
