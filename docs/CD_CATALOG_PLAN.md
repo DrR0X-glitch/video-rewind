@@ -29,10 +29,10 @@ The stock view should use a shared display projection for either a video title o
 Use this server-side request header:
 
 ```http
-User-Agent: VideoRewind/0.1.0 (+https://github.com/DrR0X-glitch/video-rewind)
+User-Agent: VideoRewind/0.1.0
 ```
 
-This identifies the application, uses the current package version (`0.1.0`), and provides a project URL for identification/contact. Keep the product token as `VideoRewind`; source the version from `package.json` so it can be updated without changing the provider code. Send the header from the server-side provider on every Discogs API request; never call the API directly from the browser. Do not use Discogs in the application name or imply Discogs endorsement. Discogs requires an identifying User-Agent and demonstrates an application/version plus project URL pattern in its [API developer documentation](https://www.discogs.com/developers/); its official client also documents the header as required for API requests ([Discogs client quickstart](https://github.com/discogs/discogs_client/blob/master/docs/quickstart.md)).
+This identifies the application and uses the current package version (`0.1.0`). Keep the product token as `VideoRewind`; source the version from `package.json` so it can be updated without changing the provider code. No public site or repository URL is needed in the header. Send it from the server-side provider on every Discogs API request; never call the API directly from the browser. Do not use Discogs in the application name or imply Discogs endorsement. Discogs requires an identifying User-Agent; its official client documents `ExampleApplication/0.1` as a valid identifying string ([Discogs client quickstart](https://github.com/discogs/discogs_client/blob/master/docs/quickstart.md)).
 
 ## Track list and search data
 

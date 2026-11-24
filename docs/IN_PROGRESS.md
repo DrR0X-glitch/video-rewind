@@ -14,7 +14,7 @@ Live register of work currently in progress or waiting in the backlog. Remove co
 | ------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | DVD-007 | Expand domain test coverage             | Add focused server, database, and browser tests as each product domain is implemented or substantially changed.                                                                       |
 | DVD-008 | Prepare deployment cutover              | Keep deployment on hold until the roadmap is complete and staff authentication is ready; rehearse migration and recovery before cutover.                                              |
-| DVD-014 | Add staff-only CD catalog with Discogs  | Use a separate release model; persist confirmed CC0 metadata/tracks per release with attribution and direct link. Server-side env template includes User-Agent and consumer key/secret; fetch permitted non-CC0 art only on release pages, with browser cache capped at six hours and no app/server cache. |
+| DVD-014 | Add staff-only CD catalog with Discogs  | Use a separate release model; persist confirmed CC0 metadata/tracks per release with attribution and direct link. Server-side env template uses `VideoRewind/0.1.0` plus consumer key/secret; fetch permitted non-CC0 art only on release pages, with browser cache capped at six hours and no app/server cache. |
 | DVD-017 | Extract catalog and stock read services | Move the title visibility and stock projection queries touched by format support from `lib/server/store.ts` into catalog/inventory query services.                                    |
 
 ## Register rules
