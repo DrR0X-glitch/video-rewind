@@ -248,6 +248,8 @@ Discogs candidate results should place the title on its own line and group small
 
 Compact search forms should give the text field the flexible width and keep the submit button immediately to its right, aligned with the field.
 
+Inventory table headers should remain visible while scrolling, using a solid header background so rows do not show through the labels.
+
 Search inputs use the same square border, neutral background, text color, and padding as text inputs; remove native rounded search-field styling for a consistent form appearance.
 
 UPC/EAN forms align the barcode input and camera-scan action on one row, with the scan action at the right. Related availability and condition checkboxes may share a compact two-column row, with each checkbox immediately beside its label.

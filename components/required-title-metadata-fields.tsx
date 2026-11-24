@@ -37,7 +37,7 @@ export function RequiredTitleMetadataFields({
           maxLength={200}
         />
       </label>
-      <label>
+      <label className="release-year-field">
         Release year
         <input
           type="number"

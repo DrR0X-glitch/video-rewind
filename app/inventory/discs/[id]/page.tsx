@@ -111,7 +111,7 @@ export default async function InventoryDiscPage(props: PageProps<"/inventory/dis
               <input type="text" name="row" defaultValue={disc.row} maxLength={2} />
             </label>
 
-            <div className="inline-split">
+            <div className="disc-status-row">
               <label className="checkbox-row">
                 <input
                   type="checkbox"
@@ -136,9 +136,6 @@ export default async function InventoryDiscPage(props: PageProps<"/inventory/dis
                   </span>
                 </label>
               ) : null}
-            </div>
-
-            <div className="inline-split">
               <label className="checkbox-row">
                 <input type="checkbox" name="sealed" value="true" defaultChecked={disc.sealed} />
                 <span className={`status-pill status-${getSealedTone(disc.sealed)}`}>Sealed?</span>

@@ -570,7 +570,7 @@ export function InventoryNewFlow({
         <>
           <section className="panel section">
             <h2>2. Resolve Title from TMDB</h2>
-            <form className="stack-form">
+            <form className="stack-form cd-search-form">
               <label>
                 TMDB link
                 <input

@@ -11,16 +11,11 @@ Live register of work currently in progress or waiting in the backlog. Remove co
 
 ## Backlog
 
-| ID      | Task                                    | Notes                                                                                                                                              |
-| ------- | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| DVD-007 | Expand domain test coverage             | Add focused server, database, and browser tests as each product domain is implemented or substantially changed.                                    |
-| DVD-008 | Prepare deployment cutover              | Keep deployment on hold until the roadmap is complete and staff authentication is ready; rehearse migration and recovery before cutover.           |
-| DVD-017 | Extract catalog and stock read services | Move the title visibility and stock projection queries touched by format support from `lib/server/store.ts` into catalog/inventory query services. |
-| DVD-018 | Align TMDB Resolve button               | Move the Resolve button to the right of its search box in the existing title-entry flow.                                                           |
-| DVD-019 | Fix release-year input styling          | Correct the unusual, inconsistent input appearance of the release-year field in the existing title-entry flow.                                     |
-| DVD-020 | Simplify sealed status updates          | Remove the changing-property control in favor of a direct `Sealed?` checkbox whose checked state is saved as the current value.                    |
-| DVD-021 | Align movie disc status checkboxes      | Put the Available?, Reviewed?, and Sealed? controls together in one row on the movie disc management page.                                         |
-| DVD-022 | Keep stock table headers visible        | Make stock table header rows sticky while scrolling so column names remain visible.                                                                |
+| ID      | Task                               | Notes                                                                                                                                                                                                  |
+| ------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| DVD-007 | Expand domain test coverage        | Add focused server, database, and browser tests as each product domain is implemented or substantially changed.                                                                                        |
+| DVD-008 | Prepare deployment cutover         | Keep deployment on hold until the roadmap is complete and staff authentication is ready; rehearse migration and recovery before cutover.                                                               |
+| DVD-017 | Extract catalog visibility queries | Stock read queries and helpers now live in `lib/server/inventory/stock-queries.ts`; extract the remaining title visibility and browse/detail queries from `lib/server/store.ts` into catalog services. |
 
 ## Register rules
 

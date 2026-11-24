@@ -955,6 +955,23 @@ h2 {
   white-space: nowrap;
 }
 
+.release-year-field {
+  min-width: 0;
+}
+
+.release-year-field input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+}
+
+.disc-status-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem 1rem;
+  flex-wrap: wrap;
+}
+
 .linked-title-fields {
   display: grid;
   gap: 0.5rem;
@@ -1138,6 +1155,13 @@ button:disabled {
 
 .stock-table-shell {
   overflow-x: auto;
+}
+
+.stock-table-shell thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--panel-strong);
 }
 
 .stock-table-footer {

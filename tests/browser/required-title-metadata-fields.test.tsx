@@ -22,5 +22,8 @@ describe("required title metadata fields", () => {
     }
     expect(screen.getByLabelText("Release year").getAttribute("min")).toBe("1000");
     expect(screen.getByLabelText("Release year").getAttribute("max")).toBe("9999");
+    expect(
+      screen.getByLabelText("Release year").parentElement?.classList.contains("release-year-field"),
+    ).toBe(true);
   });
 });
