@@ -39,7 +39,7 @@ export default async function InventoryNewPage({ searchParams }: InventoryNewPag
         tmdbId: tmdbDraft.tmdbId,
         mediaType: tmdbDraft.mediaType,
         title: tmdbDraft.title,
-        releaseDate: tmdbDraft.releaseDate,
+        releaseYear: Number(tmdbDraft.releaseDate.slice(0, 4)) || undefined,
       }).catch(() => null)
     : null;
   const duplicateMovie =

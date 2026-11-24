@@ -1,6 +1,7 @@
 import "server-only";
 
 import { formatZoneLabel } from "@/lib/constants";
+import { normalizeReleaseYearInput, ReleaseYearInputError } from "@/lib/catalog/release-year-input";
 import { pool } from "@/lib/server/db";
 import { fetchOmdbTitleMetadataByImdbId } from "@/lib/server/omdb";
 import {
@@ -112,6 +113,7 @@ type TitleRow = {
   sort_title: string;
   overview: string;
   release_date: string | Date | null;
+  release_year: number;
   poster_path: string | null;
   genres: string[] | null;
   director: string;
@@ -149,6 +151,7 @@ type InventoryItemRow = {
     sort_title?: string | null;
     media_type: "movie" | "series";
     release_date: string | Date | null;
+    release_year: number;
     season_start?: number | null;
     season_end?: number | null;
     episode_start?: number | null;
@@ -172,6 +175,7 @@ type CollectionTitleRow = {
   sort_title: string;
   media_type: "movie" | "series";
   release_date: string | Date | null;
+  release_year: number;
 };
 
 type StockDiscRow = InventoryItemRow & {
@@ -202,6 +206,7 @@ function toUiLinkedTitle(title: {
   sort_title?: string | null;
   media_type: "movie" | "series";
   release_date: string | Date | null;
+  release_year: number;
   season_start?: number | null;
   season_end?: number | null;
   episode_start?: number | null;
@@ -213,6 +218,7 @@ function toUiLinkedTitle(title: {
     sortTitle: title.sort_title || getSuggestedSortTitle(title.title),
     mediaType: title.media_type,
     releaseDate: formatDateOnly(title.release_date) ?? "",
+    releaseYear: Number(title.release_year),
     seasonStart: typeof title.season_start === "number" ? title.season_start : undefined,
     seasonEnd: typeof title.season_end === "number" ? title.season_end : undefined,
     episodeStart: typeof title.episode_start === "number" ? title.episode_start : undefined,
@@ -267,6 +273,7 @@ function toUiTitle(row: TitleRow, inventoryItems: InventoryItem[] = []): MovieWi
     sortTitle: row.sort_title || getSuggestedSortTitle(row.title),
     overview: row.overview ?? "",
     releaseDate: formatDateOnly(row.release_date) ?? "",
+    releaseYear: Number(row.release_year),
     posterUrl: formatPosterUrl(row.poster_path, "detail"),
     posterColor: getPosterColor(row.title),
     genres: row.genres ?? [],
@@ -409,12 +416,12 @@ function buildListTitlesQuery(filters: MovieFilters) {
   if (filters.decade) {
     if (filters.decade === "pre-1950") {
       values.push(1950);
-      conditions.push(`t.release_date < MAKE_DATE($${values.length}, 1, 1)`);
+      conditions.push(`t.release_year < $${values.length}`);
     } else {
       values.push(filters.decade);
       values.push(filters.decade + 10);
       conditions.push(
-        `t.release_date >= MAKE_DATE($${values.length - 1}, 1, 1) AND t.release_date < MAKE_DATE($${values.length}, 1, 1)`,
+        `t.release_year >= $${values.length - 1} AND t.release_year < $${values.length}`,
       );
     }
   }
@@ -439,9 +446,9 @@ function buildListTitlesQuery(filters: MovieFilters) {
         : filters.sort === "popular"
           ? "ORDER BY COUNT(DISTINCT i.id) DESC, MAX(i.last_rented_at) DESC NULLS LAST, t.imdb_rating DESC NULLS LAST, t.sort_title ASC"
           : filters.sort === "year-desc"
-            ? "ORDER BY t.release_date DESC NULLS LAST, t.sort_title ASC, t.title ASC"
+            ? "ORDER BY t.release_year DESC, t.sort_title ASC, t.title ASC"
             : filters.sort === "year-asc"
-              ? "ORDER BY t.release_date ASC NULLS LAST, t.sort_title ASC, t.title ASC"
+              ? "ORDER BY t.release_year ASC, t.sort_title ASC, t.title ASC"
               : "ORDER BY t.sort_title ASC, t.title ASC";
 
   return {
@@ -456,6 +463,7 @@ function buildListTitlesQuery(filters: MovieFilters) {
         t.sort_title,
         t.overview,
         t.release_date,
+        t.release_year,
         t.poster_path,
         t.genres,
         t.director,
@@ -518,6 +526,7 @@ async function getInventoryItemsForTitle(titleId: string, options?: { reviewedOn
               'sort_title', t2.sort_title,
               'media_type', t2.media_type::text,
               'release_date', t2.release_date,
+              'release_year', t2.release_year,
               'season_start', itt2.season_start,
               'season_end', itt2.season_end,
               'episode_start', itt2.episode_start,
@@ -581,14 +590,15 @@ async function getCollectionDataForTitle(
         t.title,
         t.sort_title,
         t.media_type,
-        t.release_date
+        t.release_date,
+        t.release_year
       FROM collection_titles current_ct
       INNER JOIN collections c ON c.id = current_ct.collection_id
       INNER JOIN collection_titles ct ON ct.collection_id = c.id
       INNER JOIN titles t ON t.id = ct.title_id
       WHERE current_ct.title_id = $1
       ${reviewedCondition}
-      ORDER BY ct.position ASC, t.release_date ASC NULLS LAST, t.sort_title ASC, t.title ASC;
+      ORDER BY ct.position ASC, t.release_year ASC, t.sort_title ASC, t.title ASC;
     `,
     [titleId],
   );
@@ -613,6 +623,7 @@ async function getCollectionDataForTitle(
         sort_title: row.sort_title,
         media_type: row.media_type,
         release_date: row.release_date,
+        release_year: row.release_year,
       }),
     ),
   };
@@ -648,6 +659,7 @@ export async function getInventoryItemById(id: string) {
               'sort_title', t.sort_title,
               'media_type', t.media_type::text,
               'release_date', t.release_date,
+              'release_year', t.release_year,
               'season_start', itt.season_start,
               'season_end', itt.season_end,
               'episode_start', itt.episode_start,
@@ -684,9 +696,9 @@ export async function getMovieFiltersFromDatabase(): Promise<{
   genres: string[];
   years: number[];
 }> {
-  const result = await pool.query<{ genres: string[] | null; release_date: string | Date | null }>(
+  const result = await pool.query<{ genres: string[] | null; release_year: number }>(
     `
-      SELECT DISTINCT t.genres, t.release_date
+      SELECT DISTINCT t.genres, t.release_year
       FROM titles t
       INNER JOIN inventory_item_titles itt ON itt.title_id = t.id
       INNER JOIN inventory_items i ON i.id = itt.inventory_item_id
@@ -698,7 +710,7 @@ export async function getMovieFiltersFromDatabase(): Promise<{
   const years = Array.from(
     new Set(
       result.rows
-        .map((row) => (row.release_date ? new Date(row.release_date).getFullYear() : null))
+        .map((row) => Number(row.release_year))
         .filter((year): year is number => typeof year === "number" && Number.isFinite(year)),
     ),
   ).sort((a, b) => b - a);
@@ -734,6 +746,7 @@ export async function getMovieFromDatabase(id: string) {
         t.sort_title,
         t.overview,
         t.release_date,
+        t.release_year,
         t.poster_path,
         t.genres,
         t.director,
@@ -952,6 +965,7 @@ export async function getPublicMovieDetailFromDatabase(id: string) {
         t.sort_title,
         t.overview,
         t.release_date,
+        t.release_year,
         t.poster_path,
         t.genres,
         t.director,
@@ -1011,7 +1025,7 @@ export async function findDuplicateMovieForDraft(input: {
   tmdbId: string;
   mediaType: string;
   title: string;
-  releaseDate: string;
+  releaseYear?: number;
 }) {
   const tmdbMatch = await findMovieByTmdbId(input.tmdbId, input.mediaType);
 
@@ -1022,6 +1036,7 @@ export async function findDuplicateMovieForDraft(input: {
   if (!input.title.trim()) {
     return null;
   }
+  if (!input.releaseYear) return null;
 
   const result = await pool.query<{ id: string }>(
     `
@@ -1029,10 +1044,10 @@ export async function findDuplicateMovieForDraft(input: {
       FROM titles
       WHERE LOWER(title) = LOWER($1)
         AND media_type = $2::title_media_type
-        AND ($3::date IS NULL OR release_date = $3::date)
+        AND release_year = $3
       LIMIT 1
     `,
-    [input.title.trim(), input.mediaType, input.releaseDate || null],
+    [input.title.trim(), input.mediaType, input.releaseYear],
   );
 
   return result.rows[0]?.id ?? null;
@@ -1051,6 +1066,7 @@ export async function getFeaturedMoviesFromDatabase() {
         t.sort_title,
         t.overview,
         t.release_date,
+        t.release_year,
         t.poster_path,
         t.genres,
         t.director,
@@ -1086,6 +1102,7 @@ export async function getRecentlyReturnedMoviesFromDatabase(limit = 6) {
         t.sort_title,
         t.overview,
         t.release_date,
+        t.release_year,
         t.poster_path,
         t.genres,
         t.director,
@@ -1117,30 +1134,41 @@ export async function createMovieInDatabase(input: {
   mediaType: string;
   title: string;
   sortTitle: string;
+  releaseYear: unknown;
   overview: string;
-  releaseDate: string;
+  releaseDate?: string;
   posterPath: string | null;
   genres: string[];
   director: string;
   cast: Array<{ name: string; character: string }>;
   collection?: TmdbCollectionDraft | null;
 }) {
+  const normalizedTitle = input.title.trim();
+  const normalizedSortTitle = input.sortTitle.trim();
+  let releaseYear: number | null;
+  try {
+    releaseYear = normalizeReleaseYearInput(input.releaseYear);
+  } catch (error) {
+    if (error instanceof ReleaseYearInputError) throw createHttpError(400, error.message);
+    throw error;
+  }
+  if (!normalizedTitle) throw createHttpError(400, 'Field "title" is required');
+  if (!normalizedSortTitle) throw createHttpError(400, 'Field "sort_title" is required');
+  if (releaseYear === null) throw createHttpError(400, 'Field "release_year" is required');
+  const releaseDate = input.releaseDate?.trim() ?? "";
+  if (releaseDate && Number(releaseDate.slice(0, 4)) !== releaseYear) {
+    throw createHttpError(400, "Release date must match the release year.");
+  }
+
   const duplicateId = await findDuplicateMovieForDraft({
     tmdbId: input.tmdbId,
     mediaType: input.mediaType,
-    title: input.title,
-    releaseDate: input.releaseDate,
+    title: normalizedTitle,
+    releaseYear,
   });
 
   if (duplicateId) {
     throw createHttpError(409, "Title already exists");
-  }
-
-  const normalizedTitle = input.title.trim();
-  const normalizedSortTitle = input.sortTitle.trim() || getSuggestedSortTitle(normalizedTitle);
-
-  if (!normalizedTitle) {
-    throw createHttpError(400, 'Field "title" is required');
   }
 
   const normalizedImdbId =
@@ -1165,8 +1193,9 @@ export async function createMovieInDatabase(input: {
       mediaType: normalizeMediaType(input.mediaType),
       title: normalizedTitle,
       sortTitle: normalizedSortTitle,
+      releaseYear,
       overview: input.overview.trim(),
-      releaseDate: input.releaseDate || "",
+      releaseDate,
       posterPath: input.posterPath,
       genres: input.genres,
       director: input.director.trim() || "",
@@ -1191,8 +1220,8 @@ export async function createMovieInDatabase(input: {
       const duplicateId = await findDuplicateMovieForDraft({
         tmdbId: input.tmdbId,
         mediaType: input.mediaType,
-        title: input.title,
-        releaseDate: input.releaseDate,
+        title: normalizedTitle,
+        releaseYear,
       });
 
       if (duplicateId) {
@@ -1217,6 +1246,7 @@ async function upsertTitleFromDraft(
     mediaType: "movie" | "series";
     title: string;
     sortTitle: string;
+    releaseYear: number;
     overview: string;
     releaseDate: string;
     posterPath: string | null;
@@ -1235,6 +1265,7 @@ async function upsertTitleFromDraft(
         title,
         sort_title,
         overview,
+        release_year,
         release_date,
         poster_path,
         genres,
@@ -1242,7 +1273,7 @@ async function upsertTitleFromDraft(
         cast_members,
         featured
       )
-      VALUES ($1, $2, $3, $4::title_media_type, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13)
+      VALUES ($1, $2, $3, $4::title_media_type, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14)
       ON CONFLICT (tmdb_id, media_type)
       DO UPDATE SET
         imdb_id = COALESCE(EXCLUDED.imdb_id, titles.imdb_id),
@@ -1257,7 +1288,11 @@ async function upsertTitleFromDraft(
           WHEN EXCLUDED.overview <> '' THEN EXCLUDED.overview
           ELSE titles.overview
         END,
-        release_date = COALESCE(EXCLUDED.release_date, titles.release_date),
+        release_year = EXCLUDED.release_year,
+        release_date = CASE
+          WHEN EXCLUDED.release_year <> titles.release_year THEN EXCLUDED.release_date
+          ELSE COALESCE(EXCLUDED.release_date, titles.release_date)
+        END,
         poster_path = COALESCE(EXCLUDED.poster_path, titles.poster_path),
         genres = CASE
           WHEN CARDINALITY(EXCLUDED.genres) > 0 THEN EXCLUDED.genres
@@ -1282,6 +1317,7 @@ async function upsertTitleFromDraft(
       input.title.trim(),
       input.sortTitle.trim(),
       input.overview.trim(),
+      input.releaseYear,
       input.releaseDate || null,
       input.posterPath,
       input.genres,
@@ -1438,6 +1474,7 @@ export async function getAlphabeticalStockSectionsFromDatabase(input: {
               'sort_title', t.sort_title,
               'media_type', t.media_type::text,
               'release_date', t.release_date,
+              'release_year', t.release_year,
               'season_start', itt.season_start,
               'season_end', itt.season_end,
               'episode_start', itt.episode_start,
@@ -1819,6 +1856,7 @@ export async function listStockDiscsFromDatabase(input: {
               'title', t.title,
               'media_type', t.media_type::text,
               'release_date', t.release_date,
+              'release_year', t.release_year,
               'season_start', itt.season_start,
               'season_end', itt.season_end,
               'episode_start', itt.episode_start,
@@ -1914,6 +1952,19 @@ export async function updateMovieInDatabase(id: string, body: Record<string, unk
     body.sort_title === undefined ? null : requireNonEmptyString(body.sort_title, "sort_title");
   const overview = body.overview === undefined ? null : (optionalString(body.overview) ?? "");
   const releaseDate = body.release_date === undefined ? null : optionalString(body.release_date);
+  let releaseYear: number | null = null;
+  if (body.release_year !== undefined) {
+    try {
+      releaseYear = normalizeReleaseYearInput(body.release_year);
+    } catch (error) {
+      if (error instanceof ReleaseYearInputError) throw createHttpError(400, error.message);
+      throw error;
+    }
+    if (releaseYear === null) throw createHttpError(400, 'Field "release_year" is required');
+  }
+  if (releaseDate && releaseYear !== null && Number(releaseDate.slice(0, 4)) !== releaseYear) {
+    throw createHttpError(400, "Release date must match the release year.");
+  }
   const mediaType = body.media_type === undefined ? null : normalizeMediaType(body.media_type);
   const featured =
     body.featured === undefined
@@ -1982,6 +2033,7 @@ export async function updateMovieInDatabase(id: string, body: Record<string, unk
     sortTitle === null &&
     overview === null &&
     releaseDate === null &&
+    releaseYear === null &&
     mediaType === null &&
     featured === null &&
     hideFromHomepage === null &&
@@ -2000,7 +2052,11 @@ export async function updateMovieInDatabase(id: string, body: Record<string, unk
         title = COALESCE($2, title),
         sort_title = COALESCE($3, sort_title),
         overview = COALESCE($4, overview),
-        release_date = COALESCE($5::date, release_date),
+        release_year = COALESCE($13, release_year),
+        release_date = CASE
+          WHEN $13 IS NOT NULL AND $13 <> release_year THEN NULL
+          ELSE COALESCE($5::date, release_date)
+        END,
         media_type = COALESCE($6::title_media_type, media_type),
         featured = COALESCE($7, featured),
         hide_from_homepage = COALESCE($8, hide_from_homepage),
@@ -2025,6 +2081,7 @@ export async function updateMovieInDatabase(id: string, body: Record<string, unk
       posterPath,
       genres,
       castMembers ? JSON.stringify(castMembers.map((name) => ({ name, character: "" }))) : null,
+      releaseYear,
     ],
   );
 

@@ -19,11 +19,11 @@ export async function createCustomTitle(input: CustomTitleInput) {
         FROM titles
         WHERE LOWER(BTRIM(title)) = LOWER($1)
           AND media_type = $2::title_media_type
-          AND ($3::date IS NULL OR release_date = $3::date)
-        ORDER BY release_date NULLS FIRST, created_at ASC
+          AND release_year = $3
+        ORDER BY created_at ASC
         LIMIT 1;
       `,
-      [title.title, title.mediaType, title.releaseDate],
+      [title.title, title.mediaType, title.releaseYear],
     );
 
     if (duplicate.rows[0]) {
@@ -38,6 +38,7 @@ export async function createCustomTitle(input: CustomTitleInput) {
           media_type,
           title,
           sort_title,
+          release_year,
           overview,
           release_date,
           genres,
@@ -45,15 +46,15 @@ export async function createCustomTitle(input: CustomTitleInput) {
           cast_members,
           metadata_source
         )
-        VALUES (NULL, $1::title_media_type, $2, $3, $4, $5::date, $6::text[], $7, '[]'::jsonb, 'manual')
+        VALUES (NULL, $1::title_media_type, $2, $3, $4, $5, NULL, $6::text[], $7, '[]'::jsonb, 'manual')
         RETURNING id;
       `,
       [
         title.mediaType,
         title.title,
         title.sortTitle,
+        title.releaseYear,
         title.overview,
-        title.releaseDate,
         title.genres,
         title.director,
       ],

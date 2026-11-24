@@ -54,7 +54,7 @@ Include:
 - Media type (`movie` or `series`)
 - Sort title
 - Overview
-- Release/first-air date
+- Release/first-air year; the exact date is optional
 - Poster
 - Genres
 - Director/creator
@@ -183,8 +183,9 @@ Fields:
 - `media_type` (`movie`, `series`)
 - `title`
 - `sort_title`
+- `release_year` (required four digit year used for decade filtering)
 - `overview`
-- `release_date`
+- `release_date` (optional exact date; its year must match `release_year`)
 - `poster_path`
 - `genres`
 - `director`
@@ -197,6 +198,7 @@ Fields:
 Notes:
 
 - `sort_title` exists because filing may ignore leading articles.
+- `title`, `sort_title`, and `release_year` are required for manual and TMDB-backed title entry. When a source only provides a year, the app does not invent a month or day.
 - `director` stores the director for movies and the creator label for series in the current UI.
 - `imdb_id` is captured from TMDB external ids when a title is created from the TMDB lookup flow.
 - `imdb_rating` is populated from OMDb when an IMDb id is available and the OMDb API key is configured.
@@ -382,7 +384,7 @@ Creates a new title after TMDB resolution and duplicate checking.
 
 ### `PATCH /movies/:id`
 
-Updates editable title metadata such as title, sort title, media type, overview, release date, genres, cast, director, featured, and hide-from-homepage.
+Updates editable title metadata such as title, sort title, media type, overview, release year, optional exact release date, genres, cast, director, featured, and hide-from-homepage.
 
 ### `DELETE /movies/:id`
 

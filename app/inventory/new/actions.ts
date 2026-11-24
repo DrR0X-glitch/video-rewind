@@ -64,7 +64,7 @@ export async function createTitleAndAddToDisc(formData: FormData) {
     tmdbId: tmdbDraft.tmdbId,
     mediaType: tmdbDraft.mediaType,
     title: tmdbDraft.title,
-    releaseDate: tmdbDraft.releaseDate,
+    releaseYear: Number(tmdbDraft.releaseDate.slice(0, 4)) || undefined,
   });
 
   if (duplicateId) {
@@ -85,10 +85,14 @@ export async function createTitleAndAddToDisc(formData: FormData) {
     tmdbId: tmdbDraft.tmdbId,
     imdbId: tmdbDraft.imdbId,
     mediaType: tmdbDraft.mediaType,
-    title: getString(formData, "title") || tmdbDraft.title,
-    sortTitle: getString(formData, "sortTitle") || tmdbDraft.sortTitle,
+    title: getString(formData, "title"),
+    sortTitle: getString(formData, "sortTitle"),
+    releaseYear: getString(formData, "releaseYear"),
     overview: tmdbDraft.overview,
-    releaseDate: tmdbDraft.releaseDate,
+    releaseDate:
+      tmdbDraft.releaseDate.slice(0, 4) === getString(formData, "releaseYear")
+        ? tmdbDraft.releaseDate
+        : "",
     posterPath: tmdbDraft.posterPath,
     genres: tmdbDraft.genres,
     director: tmdbDraft.director,
@@ -119,7 +123,7 @@ export async function createTitleOnly(formData: FormData) {
     tmdbId: tmdbDraft.tmdbId,
     mediaType: tmdbDraft.mediaType,
     title: tmdbDraft.title,
-    releaseDate: tmdbDraft.releaseDate,
+    releaseYear: Number(tmdbDraft.releaseDate.slice(0, 4)) || undefined,
   });
 
   if (duplicateId) {
@@ -132,10 +136,14 @@ export async function createTitleOnly(formData: FormData) {
     tmdbId: tmdbDraft.tmdbId,
     imdbId: tmdbDraft.imdbId,
     mediaType: tmdbDraft.mediaType,
-    title: getString(formData, "title") || tmdbDraft.title,
-    sortTitle: getString(formData, "sortTitle") || tmdbDraft.sortTitle,
+    title: getString(formData, "title"),
+    sortTitle: getString(formData, "sortTitle"),
+    releaseYear: getString(formData, "releaseYear"),
     overview: tmdbDraft.overview,
-    releaseDate: tmdbDraft.releaseDate,
+    releaseDate:
+      tmdbDraft.releaseDate.slice(0, 4) === getString(formData, "releaseYear")
+        ? tmdbDraft.releaseDate
+        : "",
     posterPath: tmdbDraft.posterPath,
     genres: tmdbDraft.genres,
     director: tmdbDraft.director,
@@ -156,7 +164,7 @@ export async function createCustomTitleForNewDisc(formData: FormData) {
       title: getString(formData, "customTitle"),
       sortTitle: getString(formData, "customSortTitle"),
       mediaType: getString(formData, "customMediaType"),
-      releaseDate: getString(formData, "customReleaseDate"),
+      releaseYear: getString(formData, "customReleaseYear"),
       overview: getString(formData, "customOverview"),
       genres: getString(formData, "customGenres"),
       director: getString(formData, "customDirector"),

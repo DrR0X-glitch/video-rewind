@@ -98,7 +98,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
                   </td>
                   <td>
                     <Link href={`/inventory/${movie.id}`}>
-                      {formatMovieTitleWithYear(movie.title, movie.releaseDate)}
+                      {formatMovieTitleWithYear(movie.title, movie.releaseYear)}
                     </Link>
                   </td>
                   <td>{movie.sortTitle}</td>

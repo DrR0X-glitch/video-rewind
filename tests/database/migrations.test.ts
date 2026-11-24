@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
   createInventoryZone,
+  deleteEmptyInventoryZone,
   listInventoryZones,
   renameInventoryZone,
   setInventoryZoneActive,
@@ -52,6 +53,7 @@ describe("local PostgreSQL setup", () => {
       "0002_inventory_zones.sql",
       "0003_custom_titles.sql",
       "0004_inventory_upc_ean.sql",
+      "0005_required_title_year.sql",
     ]);
     expect(result.rows.every((row) => /^[a-f0-9]{64}$/.test(row.checksum))).toBe(true);
   });
@@ -77,6 +79,20 @@ describe("local PostgreSQL setup", () => {
     expect(Number(result.rows[0]?.link_count)).toBeGreaterThanOrEqual(10);
     expect(result.rows[0]?.known_zone_count).toBe("3");
     expect(result.rows[0]?.active_known_zone_count).toBe("3");
+  });
+
+  it("requires a release year and a non-empty sort title", async () => {
+    const result = await pool!.query<{
+      year_nullable: string;
+      year_count: string;
+      invalid_titles: string;
+    }>(`
+      SELECT
+        (SELECT is_nullable FROM information_schema.columns WHERE table_name = 'titles' AND column_name = 'release_year') AS year_nullable,
+        (SELECT COUNT(*) FROM titles WHERE release_year IS NULL) AS year_count,
+        (SELECT COUNT(*) FROM titles WHERE BTRIM(sort_title) = '') AS invalid_titles
+    `);
+    expect(result.rows[0]).toEqual({ year_nullable: "NO", year_count: "0", invalid_titles: "0" });
   });
 
   it("stores UPC/EAN values on inventory copies without requiring uniqueness", async () => {
@@ -153,6 +169,30 @@ describe("local PostgreSQL setup", () => {
       const reactivated = await setInventoryZoneActive(code, true);
       expect(reactivated.isActive).toBe(true);
     } finally {
+      await pool!.query("DELETE FROM inventory_zones WHERE code = $1", [code]);
+    }
+  });
+
+  it("permanently deletes an empty zone and refuses one containing discs", async () => {
+    const code = `X${randomBytes(2).toString("hex").slice(0, 3).toUpperCase()}`;
+    let itemId: string | undefined;
+    try {
+      await createInventoryZone({ code, label: "Temporary" });
+      const title = await pool!.query<{ id: string }>("SELECT id FROM titles LIMIT 1");
+      const item = await createInventoryItemInDatabase({
+        title_ids: title.rows[0]!.id,
+        format: "dvd",
+        zone: code,
+        section: "T",
+      });
+      itemId = item.id;
+      await expect(deleteEmptyInventoryZone(code)).rejects.toThrow(/Move all discs out/);
+      await pool!.query("UPDATE inventory_items SET zone = 'S' WHERE id = $1", [itemId]);
+      await expect(deleteEmptyInventoryZone(code)).resolves.toEqual({ code });
+      const deleted = await pool!.query("SELECT 1 FROM inventory_zones WHERE code = $1", [code]);
+      expect(deleted.rowCount).toBe(0);
+    } finally {
+      if (itemId) await pool!.query("DELETE FROM inventory_items WHERE id = $1", [itemId]);
       await pool!.query("DELETE FROM inventory_zones WHERE code = $1", [code]);
     }
   });

@@ -29,7 +29,7 @@ export async function saveTitleEdits(titleId: string, formData: FormData) {
     title: getString(formData, "title"),
     sort_title: getString(formData, "sortTitle"),
     media_type: getString(formData, "mediaType"),
-    release_date: getString(formData, "releaseDate"),
+    release_year: getString(formData, "releaseYear"),
     genres: getString(formData, "genres"),
     director: getString(formData, "director"),
     cast: getString(formData, "cast"),

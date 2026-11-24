@@ -1,7 +1,11 @@
 import type { DiscFormat, InventoryItem, MediaType, MovieWithInventory } from "@/lib/types";
 import { formatZoneLabel } from "@/lib/constants";
 
-export function formatReleaseYear(date: string): string {
+export function formatReleaseYear(date: string | number): string {
+  if (typeof date === "number") {
+    return Number.isInteger(date) ? date.toString() : "Unknown";
+  }
+  if (/^\d{4}$/.test(date)) return date;
   const parsed = new Date(date);
   return Number.isNaN(parsed.getTime()) ? "Unknown" : parsed.getFullYear().toString();
 }
@@ -34,7 +38,7 @@ export function formatDateTime(date: string): string {
   });
 }
 
-export function formatMovieTitleWithYear(title: string, date: string): string {
+export function formatMovieTitleWithYear(title: string, date: string | number): string {
   const year = formatReleaseYear(date);
   return year === "Unknown" ? title : `${title} (${year})`;
 }
@@ -71,14 +75,14 @@ export function formatEpisodeRange(episodeStart?: number, episodeEnd?: number): 
 
 export function formatLinkedTitleLabel(input: {
   title: string;
-  releaseDate: string;
+  releaseYear: number;
   mediaType: MediaType;
   seasonStart?: number;
   seasonEnd?: number;
   episodeStart?: number;
   episodeEnd?: number;
 }): string {
-  const base = formatMovieTitleWithYear(input.title, input.releaseDate);
+  const base = formatMovieTitleWithYear(input.title, input.releaseYear);
 
   if (input.mediaType !== "series") {
     return base;

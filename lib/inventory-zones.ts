@@ -2,6 +2,7 @@ export type InventoryZone = {
   code: string;
   label: string;
   isActive: boolean;
+  itemCount?: number;
 };
 
 export function parseInventoryZoneCode(value: unknown): string | null {

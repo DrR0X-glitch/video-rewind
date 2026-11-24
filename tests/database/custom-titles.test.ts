@@ -21,7 +21,8 @@ describe("custom title persistence", () => {
     const input = {
       title: testTitle,
       mediaType: "movie",
-      releaseDate: "2001-09-23",
+      sortTitle: testTitle,
+      releaseYear: 2001,
       genres: "Drama, Indie",
       director: "Test Director",
     };
@@ -32,10 +33,11 @@ describe("custom title persistence", () => {
       tmdb_id: number | null;
       metadata_source: string;
       sort_title: string;
+      release_year: number;
       genres: string[];
     }>(
       `
-        SELECT tmdb_id, metadata_source, sort_title, genres
+        SELECT tmdb_id, metadata_source, sort_title, release_year, genres
         FROM titles
         WHERE id = $1;
       `,
@@ -48,6 +50,7 @@ describe("custom title persistence", () => {
       tmdb_id: null,
       metadata_source: "manual",
       sort_title: testTitle,
+      release_year: 2001,
       genres: ["Drama", "Indie"],
     });
   });

@@ -25,7 +25,7 @@ describe("catalogue and inventory formatting", () => {
     expect(
       formatLinkedTitleLabel({
         title: "Example Series",
-        releaseDate: "2020-01-01",
+        releaseYear: 2020,
         mediaType: "series",
         seasonStart: 1,
         seasonEnd: 2,

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import {
   createInventoryZone,
+  deleteEmptyInventoryZone,
   renameInventoryZone,
   setInventoryZoneActive,
 } from "@/lib/server/inventory/zones";
@@ -79,4 +80,14 @@ export async function updateInventoryZoneStatus(formData: FormData) {
 
   refreshZonePages();
   redirect(`/inventory/settings?notice=${isActive ? "activated" : "deactivated"}`);
+}
+
+export async function permanentlyDeleteInventoryZone(formData: FormData) {
+  try {
+    await deleteEmptyInventoryZone(getString(formData, "code"));
+  } catch (error) {
+    redirectWithError(error);
+  }
+  refreshZonePages();
+  redirect("/inventory/settings?notice=deleted");
 }

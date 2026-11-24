@@ -11,6 +11,7 @@ export type Movie = {
   sortTitle: string;
   overview: string;
   releaseDate: string;
+  releaseYear: number;
   posterUrl?: string | null;
   posterColor: string;
   genres: string[];
@@ -26,6 +27,7 @@ export type LinkedTitle = {
   sortTitle: string;
   mediaType: MediaType;
   releaseDate: string;
+  releaseYear: number;
   seasonStart?: number;
   seasonEnd?: number;
   episodeStart?: number;

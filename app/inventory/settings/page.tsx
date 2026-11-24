@@ -2,10 +2,12 @@ import Link from "next/link";
 
 import {
   addInventoryZone,
+  permanentlyDeleteInventoryZone,
   updateInventoryZoneLabel,
   updateInventoryZoneStatus,
 } from "@/app/inventory/settings/actions";
 import { listInventoryZones } from "@/lib/server/inventory/zones";
+import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +16,7 @@ const notices: Record<string, string> = {
   updated: "Zone name updated.",
   activated: "Zone activated.",
   deactivated: "Zone deactivated.",
+  deleted: "Zone permanently deleted.",
 };
 
 type InventorySettingsPageProps = {
@@ -89,6 +92,7 @@ export default async function InventorySettingsPage({ searchParams }: InventoryS
               <th>Code</th>
               <th>Name</th>
               <th>Status</th>
+              <th>Discs</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -114,12 +118,30 @@ export default async function InventorySettingsPage({ searchParams }: InventoryS
                   </form>
                 </td>
                 <td>{zone.isActive ? "Active" : "Inactive"}</td>
+                <td>{zone.itemCount ?? 0}</td>
                 <td>
-                  <form action={updateInventoryZoneStatus}>
-                    <input type="hidden" name="code" value={zone.code} />
-                    <input type="hidden" name="isActive" value={zone.isActive ? "false" : "true"} />
-                    <button type="submit">{zone.isActive ? "Deactivate" : "Activate"}</button>
-                  </form>
+                  <div className="header-actions">
+                    <form action={updateInventoryZoneStatus}>
+                      <input type="hidden" name="code" value={zone.code} />
+                      <input
+                        type="hidden"
+                        name="isActive"
+                        value={zone.isActive ? "false" : "true"}
+                      />
+                      <button type="submit">{zone.isActive ? "Deactivate" : "Activate"}</button>
+                    </form>
+                    {(zone.itemCount ?? 0) === 0 ? (
+                      <form action={permanentlyDeleteInventoryZone}>
+                        <input type="hidden" name="code" value={zone.code} />
+                        <ConfirmSubmitButton
+                          type="submit"
+                          message={`Permanently delete empty zone ${zone.code}? This cannot be undone.`}
+                        >
+                          Delete Permanently
+                        </ConfirmSubmitButton>
+                      </form>
+                    ) : null}
+                  </div>
                 </td>
               </tr>
             ))}
