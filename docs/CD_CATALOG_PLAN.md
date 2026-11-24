@@ -24,6 +24,16 @@ Add a separate music catalog domain instead:
 
 The stock view should use a shared display projection for either a video title or a music release. A CD-specific add flow can search by barcode, artist/title, or Discogs release ID, show candidate editions for staff confirmation, then attach the copy. Existing per-copy UPC/EAN capture remains the inventory barcode field.
 
+## Discogs API User-Agent
+
+Use this server-side request header:
+
+```http
+User-Agent: VideoRewind/0.1.0 (+https://github.com/DrR0X-glitch/video-rewind)
+```
+
+This identifies the application, uses the current package version (`0.1.0`), and provides a project URL for identification/contact. Keep the product token as `VideoRewind`; source the version from `package.json` so it can be updated without changing the provider code. Send the header from the server-side provider on every Discogs API request; never call the API directly from the browser. Do not use Discogs in the application name or imply Discogs endorsement. Discogs requires an identifying User-Agent and demonstrates an application/version plus project URL pattern in its [API developer documentation](https://www.discogs.com/developers/); its official client also documents the header as required for API requests ([Discogs client quickstart](https://github.com/discogs/discogs_client/blob/master/docs/quickstart.md)).
+
 ## Track list and search data
 
 Store only the information needed to render and search the track list:
@@ -47,34 +57,38 @@ Planning estimate, not a benchmark: assume 15 track entries per release and abou
 |               10,000 |                150,000 |                      45–120 MB |
 |               50,000 |                750,000 |                     225–600 MB |
 
-Storage is modest at a local rental collection scale. The harder part is keeping the stored Discogs data current while respecting API freshness, caching, and rate-limit rules.
+This estimate covers only releases represented in our own catalog, not a full Discogs mirror. The expected app workload uses the API for staff-selected releases and stores the compact metadata/track list once per distinct pressing.
 
-## Refresh and Discogs data rules
+## Data source, attribution, and artwork
 
-Discogs classifies track listings as CC0 data, but its API terms also say content may not be displayed when it is more than six hours older than Discogs and may not be cached/stored longer than needed for the app. The terms require “Data provided by Discogs” attribution next to API data with a link to the matching Discogs page. Check the current [API Terms of Use](https://support.discogs.com/hc/en-us/articles/360009334593-API-Terms-of-Use) again before implementation.
+**Track and release metadata:** the project owner has confirmed with Discogs that CC0 data may be stored permanently when attribution is provided and a direct link to the Discogs entry is included. Plan on using the API to find and fetch a specific release, then persist the normalized CC0 metadata and compact track list for local search. Show “Data provided by Discogs” with a direct link on the release detail page. Keep source release ID and URL with the record so attribution remains attached. Do not store user data, marketplace data, or other restricted fields. Discogs identifies release track listings, titles, dates, barcodes, and identifiers as CC0 in its [API Terms of Use](https://support.discogs.com/hc/en-us/articles/360009334593-API-Terms-of-Use).
 
-Before coding track search, choose and test a freshness strategy that covers both release pages and search results. A local index that is refreshed only when an individual release page is opened can miss newly added tracks elsewhere in the collection. A scheduled or queued refresh needs bounded concurrency, response-header-aware throttling, retry/backoff, and a clear stale-data behavior when Discogs is unavailable. Do not display expired track data as current.
+No six-hour synchronization job is planned. Provide an explicit staff refresh action if keeping a release's metadata current is useful; routine track search and release pages use the stored snapshot. API request throttling still applies to upstream lookups and should be handled by the provider adapter.
 
-Discogs release images have separate usage conditions from track metadata. Do not persist or display Discogs cover art until its use for this staff rental catalog has been checked. The stock view can show a neutral no-art tile in the meantime.
+**Artwork is permitted under Discogs' image terms, but is not CC0.** Follow those terms closely. Request/display album art only when a staff member opens that release's detail page; do not persist it or fetch it for stock rows/search results. Allow browser caching for no more than six hours; avoid server, CDN, and image-optimizer caches. If Discogs' image response headers do not provide the required browser-cache limit, use a non-persistent image route that sets a six-hour browser cache and does not write the image to app storage. Show a generic CD placeholder everywhere else. If upstream rate limits become a problem, revisit caching with the user.
 
 ## Suggested implementation phases
 
-1. **Confirm model and provider contract:** decide required release metadata, manual fallback when no Discogs match exists, cover-art behavior, refresh cadence, and what staff sees when the provider is down.
-2. **Create the music catalog domain:** versioned migrations for releases, track entries, inventory links, uniqueness, indexes, and format constraints. Add server-only Discogs search/release services with explicit timeouts and rate-limit handling.
-3. **Add staff CD intake and editing:** search/select the exact release, capture the copy UPC/EAN, assign location and pricing, and allow moving a copy to another release if staff chose the wrong pressing.
-4. **Add release detail and track search:** show the locally stored ordered track list with Discogs attribution; search tracks and show matching releases plus copy availability and locations.
-5. **Harden and verify:** exercise duplicate physical copies, alternate pressings, nested/multi-disc tracks, failed/stale upstream requests, migration forward-application, and proof that public browse/detail APIs never return CD-only records.
+1. **Domain and provider foundation:** create versioned migrations for specific releases, ordered track entries, physical-copy links, uniqueness, and indexes. Add a server-only Discogs adapter for barcode/text search and release retrieval, with typed normalized results, timeouts, and response-aware throttling.
+2. **Staff intake and release management:** search by barcode or artist/title, show exact pressing candidates for staff confirmation, attach the copy, and support correcting the selected release. Allow a manual music release if Discogs has no match, unless that path is explicitly deferred.
+3. **Persist release and track metadata:** store one normalized CC0 track list per specific Discogs release, including nested/multi-disc ordering. Keep Discogs release ID and direct URL; show attribution and link on the release detail page. Add staff-triggered refresh if useful, without a six-hour job.
+4. **Release detail and track search:** render tracks and search locally, returning matching releases and physical copies with location and availability. Request artwork only on the release detail page if image-use permission is confirmed; use a generic CD image on stock/search/other pages.
+5. **Stock integration and verification:** show CDs in staff stock and keep them out of public routes. Test exact-release deduplication, alternate pressings, nested tracks, search, Discogs errors/throttling, refresh reconciliation, artwork loading boundaries, and public isolation.
 
 Keep this work on a separate `feature/discogs-cd-catalog` branch after the current VHS/stock-art branch is reviewed. Do not start CD coding until the phase-one decisions are settled.
 
 ## Open decisions
 
-- Which local release fields should staff use for identification and filing: artist, title, year, label, catalog number, genre/style, and Discogs URL?
-- If Discogs has no matching CD, should staff be able to create a manual music release, or should the item wait for a Discogs record?
-- Should a UPC scan search Discogs by barcode first and still require staff to confirm the pressing?
-- What refresh schedule can keep the stored track index current at the expected catalog size, and what should staff see when refresh is delayed or Discogs is unavailable?
-- Is Discogs cover art permitted for this rental-only staff application, or should CD stock use no-art placeholders until separately sourced artwork is available?
-- Which CD-specific fields (if any) differ from video-copy condition, rental pricing, and location handling?
+- **Manual fallback:** confirm whether staff may create a manual release when Discogs has no exact match. This is recommended so the physical CD can still be stocked.
+- **Barcode behavior:** should a UPC scan find candidate releases and require staff to confirm the exact pressing? Recommended: yes.
+- **Missing year:** allow an unknown year, or use the same obvious placeholder convention as legacy video records?
+- **Artwork compliance:** implement page-only fetching and the six-hour browser-cache limit in line with Discogs' non-CC0 image terms.
+- **Refresh controls:** decide whether staff-triggered refresh is useful, and what should happen if Discogs is unavailable during one.
+- **Copy rules:** confirm whether CDs use the existing condition, rental price, location, and stock-history rules without CD-specific exceptions.
+
+## Access-control dependency
+
+CD pages and provider endpoints must remain in local development until staff authentication and server-side authorization exist. Hiding links in the staff menu does not protect routes or data. Add authorization checks to every CD read/write endpoint before exposing this workflow beyond the trusted local environment.
 
 ## References
 

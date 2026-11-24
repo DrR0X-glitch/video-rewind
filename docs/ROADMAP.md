@@ -54,8 +54,9 @@ Make inventory faster and more reliable before relying on it for checkout.
 - Add VHS as a staff-managed inventory format backed by existing TMDB movie/series metadata; VHS-only stock must not create a public catalogue listing.
 - Add compact poster/artwork thumbnails to staff stock rows using linked title artwork.
 - Treat CDs as a separate staff-only catalogue workstream. Keep Discogs behind a server-side provider boundary and model one release record per Discogs release; link each physical CD copy to that record so duplicate copies do not duplicate release metadata or tracks.
-- Store a compact track list per Discogs release (position, title, and duration) for staff track search and release pages. Avoid copying full Discogs payloads or per-track credits. Define refresh behavior, attribution, rate-limit handling, and upstream failure fallback before implementation; Discogs' [API terms](https://support.discogs.com/hc/en-us/articles/360009334593-API-Terms-of-Use) classify track listings as CC0 while also applying freshness and caching rules to API content.
-- See the [CD catalog plan](./CD_CATALOG_PLAN.md) for the proposed tables, storage estimate, refresh constraints, and phased staff workflow.
+- Store a compact track list per Discogs release (position, title, and duration) for staff track search and release pages. The project owner confirmed permanent storage of Discogs CC0 metadata with attribution and a direct release link; show the attribution on the release page. Avoid copying full Discogs payloads or per-track credits.
+- Fetch Discogs album art only on the release detail page under its separate non-CC0 image terms; do not persist it or load it into stock/search pages. Cap browser caching at six hours, avoid server/CDN/image-optimizer caching, and use a generic CD placeholder elsewhere.
+- See the [CD catalog plan](./CD_CATALOG_PLAN.md) for the proposed tables, storage estimate, metadata attribution, image loading boundary, and phased staff workflow.
 
 ### 3. Staff identity and security controls
 
