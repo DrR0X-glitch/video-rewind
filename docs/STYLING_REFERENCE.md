@@ -206,6 +206,7 @@ button:hover {
 ```
 
 Button-style radio groups are appropriate for short constrained choices such as disc format and zone.
+Use the same button-choice styling for mutually exclusive catalogue views, such as album-title versus song search.
 Single boolean flags such as sealed should prefer a checkbox-style control.
 Checkbox-style format filters are appropriate for stock views where multiple formats can be active at once.
 Link-style button actions are acceptable when a form action needs to visually match surrounding links.
@@ -238,6 +239,20 @@ Inventory routes replace the public nav with:
 ```txt
 Homepage | Titles | Stock | New
 ```
+
+Small secondary actions beside a page heading may sit flush right in a simple flex row and use a smaller text size than the heading (for example, the “New CD” link beside “Find or create a title”). Keep the action visually quiet and link-like.
+
+Compact track previews may use a plain list with lightly spaced rows, a muted position and duration column, and bold group headings separated by modest top spacing. Avoid card backgrounds, repeated borders, and large row padding.
+
+Discogs candidate results should place the title on its own line and group smaller muted metadata beneath it with light, consistent gaps between values. Truncate long label/attribution and format values by character count with an ellipsis and retain the full value in a title tooltip; do not impose fixed width caps on metadata fields. Leave a small gap between the search form and returned results.
+
+Compact search forms should give the text field the flexible width and keep the submit button immediately to its right, aligned with the field.
+
+Search inputs use the same square border, neutral background, text color, and padding as text inputs; remove native rounded search-field styling for a consistent form appearance.
+
+UPC/EAN forms align the barcode input and camera-scan action on one row, with the scan action at the right. Related availability and condition checkboxes may share a compact two-column row, with each checkbox immediately beside its label.
+
+Day price, weekend price, and late class use consistently styled numeric inputs in one three-column row across inventory forms and disc editing. Collapse the row to one column on narrow screens.
 
 Public header should allow a swappable logo block rather than baking text directly into the layout.
 The current placeholder logo leans into 90s video-store styling with bright orange text, a thick black outline, strong tracking, and a sign-like palette.
@@ -287,3 +302,5 @@ Quietly modernize through consistent spacing, not decorative surfaces.
 Looks nostalgic, behaves modern, stays lean.
 
 Stock-view linked titles may show a compact 36 × 54 px poster beside the title. Preserve its aspect ratio; show a small neutral “No art” box when no image is available.
+
+The dedicated CD stock view is a text-only list with release and physical-copy fields; do not show album artwork there.

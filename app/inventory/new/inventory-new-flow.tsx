@@ -856,7 +856,7 @@ function DiscFields({
               }))
             }
           />
-          <span>Available</span>
+          <span>Available?</span>
         </label>
         <label className="checkbox-row">
           <input
@@ -871,42 +871,53 @@ function DiscFields({
               }))
             }
           />
-          <span>Sealed</span>
+          <span>Sealed?</span>
         </label>
       </div>
-      <label>
-        Day price
-        <input
-          type="text"
-          name="dayPrice"
-          value={discDraft.dayPrice}
-          onChange={(event) =>
-            setDiscDraft((currentDraft) => ({ ...currentDraft, dayPrice: event.target.value }))
-          }
-        />
-      </label>
-      <label>
-        Weekend price
-        <input
-          type="text"
-          name="weekendPrice"
-          value={discDraft.weekendPrice}
-          onChange={(event) =>
-            setDiscDraft((currentDraft) => ({ ...currentDraft, weekendPrice: event.target.value }))
-          }
-        />
-      </label>
-      <label>
-        Late class
-        <input
-          type="text"
-          name="lateClass"
-          value={discDraft.lateClass}
-          onChange={(event) =>
-            setDiscDraft((currentDraft) => ({ ...currentDraft, lateClass: event.target.value }))
-          }
-        />
-      </label>
+      <div className="price-field-row">
+        <label>
+          Day price
+          <input
+            type="number"
+            name="dayPrice"
+            min="0"
+            step="0.01"
+            value={discDraft.dayPrice}
+            onChange={(event) =>
+              setDiscDraft((currentDraft) => ({ ...currentDraft, dayPrice: event.target.value }))
+            }
+          />
+        </label>
+        <label>
+          Weekend price
+          <input
+            type="number"
+            name="weekendPrice"
+            min="0"
+            step="0.01"
+            value={discDraft.weekendPrice}
+            onChange={(event) =>
+              setDiscDraft((currentDraft) => ({
+                ...currentDraft,
+                weekendPrice: event.target.value,
+              }))
+            }
+          />
+        </label>
+        <label>
+          Late class
+          <input
+            type="number"
+            name="lateClass"
+            min="0"
+            step="1"
+            value={discDraft.lateClass}
+            onChange={(event) =>
+              setDiscDraft((currentDraft) => ({ ...currentDraft, lateClass: event.target.value }))
+            }
+          />
+        </label>
+      </div>
       {selectedMovies.map((movie) => {
         const seasonDraft = seasonDrafts[movie.id] ?? {
           seasonStart: "",

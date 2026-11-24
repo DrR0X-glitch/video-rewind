@@ -112,6 +112,7 @@ export default async function InventoryStockPage({ searchParams }: StockPageProp
     availability: selectedAvailability,
     edited: selectedEdited,
     formats: selectedFormats,
+    excludeFormats: ["cd"],
     primary: selectedPrimary,
     zones: selectedZones,
     sealedStates: selectedSealedStates,
@@ -153,6 +154,7 @@ export default async function InventoryStockPage({ searchParams }: StockPageProp
             availability: selectedAvailability,
             edited: selectedEdited,
             formats: selectedFormats,
+            excludeFormats: ["cd"],
             primary: selectedPrimary,
             zones: selectedZones,
             sealedStates: selectedSealedStates,
@@ -234,7 +236,10 @@ export default async function InventoryStockPage({ searchParams }: StockPageProp
           <div>
             <h1>Stock View</h1>
           </div>
-          <Link href="/inventory">Back to Inventory</Link>
+          <div className="header-actions">
+            <Link href="/inventory/stock/cds">CD Stock</Link>
+            <Link href="/inventory">Back to Inventory</Link>
+          </div>
         </div>
         <div className="preset-strip">
           {presetOptions.map((preset) => (

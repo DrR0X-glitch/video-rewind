@@ -20,7 +20,12 @@ import {
   listStockDiscsFromDatabase,
 } from "@/lib/server/store";
 import { fetchTmdbTitleDraft } from "@/lib/server/tmdb";
-import type { MovieWithInventory, StockViewPage, StockViewSection } from "@/lib/types";
+import type {
+  MovieWithInventory,
+  PublicMovieWithInventory,
+  StockViewPage,
+  StockViewSection,
+} from "@/lib/types";
 
 export function getSuggestedSortTitle(title: string): string {
   return title.replace(/^(a|an|the)\s+/i, "").trim() || title.trim();
@@ -50,7 +55,7 @@ export async function getMovieById(id: string): Promise<MovieWithInventory> {
   return getMovieDetailFromDatabase(id);
 }
 
-export async function getPublicMovieById(id: string): Promise<MovieWithInventory> {
+export async function getPublicMovieById(id: string): Promise<PublicMovieWithInventory> {
   return getPublicMovieDetailFromDatabase(id);
 }
 
@@ -149,6 +154,7 @@ export async function listStockDiscs(input: {
   availability?: string;
   edited?: string;
   formats?: string[];
+  excludeFormats?: string[];
   primary?: string;
   zones?: string[];
   sealedStates?: string[];

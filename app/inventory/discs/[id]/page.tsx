@@ -7,14 +7,12 @@ import { listInventoryZones } from "@/lib/server/inventory/zones";
 import { getInventoryItemById } from "@/lib/server/store";
 import {
   formatDateTime,
-  formatAvailability,
   getAvailabilityTone,
   formatDiscFormat,
   formatInventoryIdentifier,
   formatLinkedTitleLabel,
   formatInventoryLocation,
   formatMediaType,
-  formatSealed,
   getSealedTone,
 } from "@/lib/format";
 
@@ -73,15 +71,23 @@ export default async function InventoryDiscPage(props: PageProps<"/inventory/dis
             <input type="hidden" name="returnTitleId" value={primaryTitle?.id ?? ""} />
             <input type="hidden" name="returnTo" value={returnTo} />
             <UpcEanInput defaultValue={disc.upcEan ?? ""} />
-            <label>
-              Format
-              <select name="format" defaultValue={disc.format}>
-                <option value="dvd">{formatDiscFormat("dvd")}</option>
-                <option value="blu-ray">{formatDiscFormat("blu-ray")}</option>
-                <option value="4k-uhd">{formatDiscFormat("4k-uhd")}</option>
-                <option value="vhs">{formatDiscFormat("vhs")}</option>
-              </select>
-            </label>
+            {disc.format === "cd" ? (
+              <label>
+                Format
+                <input type="hidden" name="format" value="cd" />
+                <span>{formatDiscFormat("cd")}</span>
+              </label>
+            ) : (
+              <label>
+                Format
+                <select name="format" defaultValue={disc.format}>
+                  <option value="dvd">{formatDiscFormat("dvd")}</option>
+                  <option value="blu-ray">{formatDiscFormat("blu-ray")}</option>
+                  <option value="4k-uhd">{formatDiscFormat("4k-uhd")}</option>
+                  <option value="vhs">{formatDiscFormat("vhs")}</option>
+                </select>
+              </label>
+            )}
 
             <label>
               Zone
@@ -114,28 +120,28 @@ export default async function InventoryDiscPage(props: PageProps<"/inventory/dis
                   defaultChecked={disc.availability}
                 />
                 <span className={`status-pill status-${getAvailabilityTone(disc.availability)}`}>
-                  {formatAvailability(disc.availability)}
+                  Available?
                 </span>
               </label>
-              <label className="checkbox-row">
-                <input
-                  type="checkbox"
-                  name="reviewed"
-                  value="true"
-                  defaultChecked={disc.reviewed}
-                />
-                <span className={`status-pill status-${disc.reviewed ? "good" : "warn"}`}>
-                  {disc.reviewed ? "Reviewed" : "Needs review"}
-                </span>
-              </label>
+              {disc.format !== "cd" ? (
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    name="reviewed"
+                    value="true"
+                    defaultChecked={disc.reviewed}
+                  />
+                  <span className={`status-pill status-${disc.reviewed ? "good" : "warn"}`}>
+                    Reviewed?
+                  </span>
+                </label>
+              ) : null}
             </div>
 
             <div className="inline-split">
               <label className="checkbox-row">
                 <input type="checkbox" name="sealed" value="true" defaultChecked={disc.sealed} />
-                <span className={`status-pill status-${getSealedTone(disc.sealed)}`}>
-                  {formatSealed(disc.sealed)}
-                </span>
+                <span className={`status-pill status-${getSealedTone(disc.sealed)}`}>Sealed?</span>
               </label>
             </div>
 
@@ -143,20 +149,40 @@ export default async function InventoryDiscPage(props: PageProps<"/inventory/dis
               Last rented: {disc.lastRentedAt ? formatDateTime(disc.lastRentedAt) : "Not recorded"}
             </p>
 
-            <label>
-              Day price
-              <input type="text" name="dayPrice" defaultValue={disc.dayPrice.toString()} />
-            </label>
+            <div className="price-field-row">
+              <label>
+                Day price
+                <input
+                  type="number"
+                  name="dayPrice"
+                  min="0"
+                  step="0.01"
+                  defaultValue={disc.dayPrice.toString()}
+                />
+              </label>
 
-            <label>
-              Weekend price
-              <input type="text" name="weekendPrice" defaultValue={disc.weekendPrice.toString()} />
-            </label>
+              <label>
+                Weekend price
+                <input
+                  type="number"
+                  name="weekendPrice"
+                  min="0"
+                  step="0.01"
+                  defaultValue={disc.weekendPrice.toString()}
+                />
+              </label>
 
-            <label>
-              Late class
-              <input type="text" name="lateClass" defaultValue={disc.lateClass.toString()} />
-            </label>
+              <label>
+                Late class
+                <input
+                  type="number"
+                  name="lateClass"
+                  min="0"
+                  step="1"
+                  defaultValue={disc.lateClass.toString()}
+                />
+              </label>
+            </div>
 
             {disc.linkedTitles.map((title) => (
               <div key={`linked-${title.id}`} className="linked-title-fields">

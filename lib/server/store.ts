@@ -26,6 +26,8 @@ import type {
   InventoryItem,
   LinkedTitle,
   MovieWithInventory,
+  PublicInventoryItem,
+  PublicMovieWithInventory,
   StockViewDisc,
   StockViewPage,
   StockViewSection,
@@ -56,6 +58,10 @@ const TITLE_SEARCH_VECTOR_SQL = `
 `;
 
 const PUBLIC_FORMATS_SQL = "i.format IN ('dvd', 'blu-ray', '4k-uhd')";
+
+function isPublicInventoryItem(item: InventoryItem): item is PublicInventoryItem {
+  return item.format === "dvd" || item.format === "blu-ray" || item.format === "4k-uhd";
+}
 
 const TITLE_METADATA_SEARCH_VECTOR_SQL = `
   (
@@ -161,6 +167,16 @@ type InventoryItemRow = {
     episode_start?: number | null;
     episode_end?: number | null;
   }>;
+  linked_music_release?: {
+    id: string;
+    source: "discogs" | "manual";
+    discogs_release_id: string | number | null;
+    title: string;
+    sort_title: string;
+    artist_credit: string;
+    release_year: number | null;
+    discogs_url: string | null;
+  } | null;
 };
 
 type CollectionRow = {
@@ -244,7 +260,9 @@ function toUiInventoryItem(item: InventoryItemRow): InventoryItem {
           ? "4k-uhd"
           : item.format.toLowerCase() === "vhs"
             ? "vhs"
-            : "dvd",
+            : item.format.toLowerCase() === "cd"
+              ? "cd"
+              : "dvd",
     sealed: Boolean(item.sealed),
     availability: item.availability,
     reviewed: item.reviewed,
@@ -254,6 +272,21 @@ function toUiInventoryItem(item: InventoryItemRow): InventoryItem {
     row: item.row,
     locationCode: item.location_code,
     linkedTitles: Array.isArray(item.linked_titles) ? item.linked_titles.map(toUiLinkedTitle) : [],
+    linkedMusicRelease: item.linked_music_release
+      ? {
+          id: item.linked_music_release.id,
+          source: item.linked_music_release.source,
+          discogsReleaseId:
+            item.linked_music_release.discogs_release_id === null
+              ? null
+              : Number(item.linked_music_release.discogs_release_id),
+          title: item.linked_music_release.title,
+          sortTitle: item.linked_music_release.sort_title,
+          artistCredit: item.linked_music_release.artist_credit,
+          releaseYear: item.linked_music_release.release_year,
+          discogsUrl: item.linked_music_release.discogs_url,
+        }
+      : undefined,
     notes: item.notes,
     lastRentedAt: formatDateOnly(item.last_rented_at) ?? undefined,
     dayPrice: Number(item.day_price),
@@ -685,7 +718,22 @@ export async function getInventoryItemById(id: string) {
             ORDER BY itt.position ASC, t.sort_title ASC
           ) FILTER (WHERE t.id IS NOT NULL),
           '[]'::jsonb
-        ) AS linked_titles
+        ) AS linked_titles,
+        (
+          SELECT JSONB_BUILD_OBJECT(
+            'id', mr.id,
+            'source', mr.source,
+            'discogs_release_id', mr.discogs_release_id,
+            'title', mr.title,
+            'sort_title', mr.sort_title,
+            'artist_credit', mr.artist_credit,
+            'release_year', mr.release_year,
+            'discogs_url', mr.discogs_url
+          )
+          FROM inventory_item_music_releases imr
+          INNER JOIN music_releases mr ON mr.id = imr.music_release_id
+          WHERE imr.inventory_item_id = i.id
+        ) AS linked_music_release
       FROM inventory_items i
       LEFT JOIN inventory_item_titles itt ON itt.inventory_item_id = i.id
       LEFT JOIN titles t ON t.id = itt.title_id
@@ -973,7 +1021,9 @@ export async function getMovieDetailFromDatabase(id: string) {
   return getMovieFromDatabase(id);
 }
 
-export async function getPublicMovieDetailFromDatabase(id: string) {
+export async function getPublicMovieDetailFromDatabase(
+  id: string,
+): Promise<PublicMovieWithInventory> {
   const result = await pool.query<TitleRow>(
     `
       SELECT
@@ -1020,8 +1070,11 @@ export async function getPublicMovieDetailFromDatabase(id: string) {
     publicOnly: true,
   });
 
+  const publicInventoryItems = inventoryItems.filter(isPublicInventoryItem);
+
   return {
-    ...toUiTitle(title, inventoryItems),
+    ...toUiTitle(title, publicInventoryItems),
+    inventoryItems: publicInventoryItems,
     collection: collectionData.collection,
     collectionTitles: collectionData.collectionTitles,
   };
@@ -1513,13 +1566,35 @@ export async function getAlphabeticalStockSectionsFromDatabase(input: {
           ) FILTER (WHERE t.id IS NOT NULL),
           '[]'::jsonb
         ) AS linked_titles,
-        COALESCE(collection_info.anchor_title, primary_title.title, '') AS sort_label,
-        COALESCE(collection_info.anchor_sort_title, primary_title.sort_title, primary_title.title, '') AS sort_anchor,
+        (
+          SELECT JSONB_BUILD_OBJECT(
+            'id', mr.id,
+            'source', mr.source,
+            'discogs_release_id', mr.discogs_release_id,
+            'title', mr.title,
+            'sort_title', mr.sort_title,
+            'artist_credit', mr.artist_credit,
+            'release_year', mr.release_year,
+            'discogs_url', mr.discogs_url
+          )
+          FROM inventory_item_music_releases imr
+          INNER JOIN music_releases mr ON mr.id = imr.music_release_id
+          WHERE imr.inventory_item_id = i.id
+        ) AS linked_music_release,
+        COALESCE(collection_info.anchor_title, primary_title.title, linked_release.title, '') AS sort_label,
+        COALESCE(collection_info.anchor_sort_title, primary_title.sort_title, primary_title.title, linked_release.sort_title, linked_release.title, '') AS sort_anchor,
         COALESCE(collection_info.first_position, 0) AS sort_sequence,
         collection_info.collection_name
       FROM inventory_items i
-      INNER JOIN inventory_item_titles itt ON itt.inventory_item_id = i.id
-      INNER JOIN titles t ON t.id = itt.title_id
+      LEFT JOIN inventory_item_titles itt ON itt.inventory_item_id = i.id
+      LEFT JOIN titles t ON t.id = itt.title_id
+      LEFT JOIN LATERAL (
+        SELECT mr.title, mr.sort_title
+        FROM inventory_item_music_releases imr
+        INNER JOIN music_releases mr ON mr.id = imr.music_release_id
+        WHERE imr.inventory_item_id = i.id
+        LIMIT 1
+      ) AS linked_release ON TRUE
       LEFT JOIN LATERAL (
         SELECT
           t0.title,
@@ -1546,12 +1621,13 @@ export async function getAlphabeticalStockSectionsFromDatabase(input: {
       ) AS collection_info ON TRUE
       WHERE i.zone = ANY($1::text[])
         AND i.format = ANY($2::inventory_format[])
+        AND (t.id IS NOT NULL OR linked_release.title IS NOT NULL)
         AND ($3::text <> 'edited-today' OR i.updated_at >= CURRENT_DATE)
-      GROUP BY i.id, primary_title.title, primary_title.sort_title, collection_info.collection_name, collection_info.anchor_title, collection_info.anchor_sort_title, collection_info.first_position
+      GROUP BY i.id, primary_title.title, primary_title.sort_title, linked_release.title, linked_release.sort_title, collection_info.collection_name, collection_info.anchor_title, collection_info.anchor_sort_title, collection_info.first_position
       ORDER BY
         CASE WHEN $3::text = 'edited-today' THEN i.updated_at END DESC NULLS LAST,
         CASE WHEN $3::text <> 'edited-today' THEN i.section END ASC,
-        CASE WHEN $3::text <> 'edited-today' THEN COALESCE(collection_info.anchor_sort_title, primary_title.sort_title, primary_title.title, '') END ASC,
+        CASE WHEN $3::text <> 'edited-today' THEN COALESCE(collection_info.anchor_sort_title, primary_title.sort_title, primary_title.title, linked_release.sort_title, linked_release.title, '') END ASC,
         CASE WHEN $3::text <> 'edited-today' THEN COALESCE(collection_info.first_position, 0) END ASC,
         CASE WHEN $3::text <> 'edited-today' THEN primary_title.sort_title END ASC,
         i.created_at ASC;
@@ -1589,6 +1665,7 @@ export async function listStockDiscsFromDatabase(input: {
   availability?: string;
   edited?: string;
   formats?: string[];
+  excludeFormats?: string[];
   primary?: string;
   zones?: string[];
   sealedStates?: string[];
@@ -1627,6 +1704,16 @@ export async function listStockDiscsFromDatabase(input: {
     values.push(`%${normalizedSearch}%`);
     const containsIndex = values.length;
     const titleTsIndex = prefixTsQuery ? (values.push(prefixTsQuery), values.length) : null;
+    const musicReleaseSearchSql = `EXISTS (
+      SELECT 1 FROM inventory_item_music_releases imrq
+      INNER JOIN music_releases mrq ON mrq.id = imrq.music_release_id
+      WHERE imrq.inventory_item_id = i.id
+        AND (
+          LOWER(mrq.title) LIKE $${prefixIndex}
+          OR LOWER(mrq.sort_title) LIKE $${prefixIndex}
+          OR LOWER(mrq.artist_credit) LIKE $${containsIndex}
+        )
+    )`;
 
     conditions.push(`
       (
@@ -1635,6 +1722,7 @@ export async function listStockDiscsFromDatabase(input: {
         OR LOWER(i.id::text) LIKE $${containsIndex}
         OR LOWER(i.location_code) LIKE $${prefixIndex}
         ${allowNotesMatch ? `OR LOWER(i.notes) LIKE $${containsIndex}` : ""}
+        OR ${musicReleaseSearchSql}
         OR EXISTS (
           SELECT 1
           FROM inventory_item_titles ittq
@@ -1695,6 +1783,7 @@ export async function listStockDiscsFromDatabase(input: {
           ELSE 0
         END
         + CASE WHEN LOWER(i.location_code) LIKE $${prefixIndex} THEN 80 ELSE 0 END
+        + CASE WHEN ${musicReleaseSearchSql} THEN 160 ELSE 0 END
         + CASE WHEN LOWER(i.id::text) LIKE $${containsIndex} THEN 40 ELSE 0 END
         + CASE WHEN ${allowNotesMatch ? `LOWER(i.notes) LIKE $${containsIndex}` : "FALSE"} THEN 10 ELSE 0 END
       )
@@ -1733,6 +1822,19 @@ export async function listStockDiscsFromDatabase(input: {
   if (normalizedFormats.length > 0) {
     values.push(normalizedFormats.join(","));
     conditions.push(`i.format = ANY(string_to_array($${values.length}, ',')::inventory_format[])`);
+  }
+
+  const excludedFormats = Array.isArray(input.excludeFormats)
+    ? input.excludeFormats
+        .filter((value) => typeof value === "string" && value.trim() !== "")
+        .map((value) => normalizeFormat(value))
+    : [];
+  if (!normalizedFormats.includes("cd") && !excludedFormats.includes("cd")) {
+    excludedFormats.push("cd");
+  }
+  if (excludedFormats.length > 0) {
+    values.push(excludedFormats.join(","));
+    conditions.push(`i.format <> ALL(string_to_array($${values.length}, ',')::inventory_format[])`);
   }
 
   const normalizedZones = Array.isArray(input.zones)
@@ -1779,8 +1881,13 @@ export async function listStockDiscsFromDatabase(input: {
     conditions.push(`i.sealed = TRUE`);
   }
 
+  conditions.push(`(
+    EXISTS (SELECT 1 FROM inventory_item_titles catalog_link WHERE catalog_link.inventory_item_id = i.id)
+    OR EXISTS (SELECT 1 FROM inventory_item_music_releases music_link WHERE music_link.inventory_item_id = i.id)
+  )`);
+
   const primaryPredicateSql = `
-    EXISTS (
+    (EXISTS (
       SELECT 1
       FROM inventory_item_titles itt0
       WHERE itt0.inventory_item_id = i.id
@@ -1797,7 +1904,10 @@ export async function listStockDiscsFromDatabase(input: {
               )
             )
         )
-    )
+    ) OR EXISTS (
+      SELECT 1 FROM inventory_item_music_releases imr
+      WHERE imr.inventory_item_id = i.id
+    ))
   `;
 
   if (input.primary === "primary") {
@@ -1809,9 +1919,9 @@ export async function listStockDiscsFromDatabase(input: {
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
   const sortTitleFallbackSql =
-    `COALESCE(collection_info.anchor_sort_title, primary_title.sort_title, primary_title.title, '') ASC, ` +
+    `COALESCE(collection_info.anchor_sort_title, primary_title.sort_title, primary_title.title, linked_release.sort_title, linked_release.title, '') ASC, ` +
     `COALESCE(collection_info.first_position, 0) ASC, ` +
-    `primary_title.sort_title ASC, primary_title.title ASC, COALESCE(i.inventory_code, i.id::text) ASC`;
+    `primary_title.sort_title ASC, primary_title.title ASC, linked_release.sort_title ASC, linked_release.title ASC, COALESCE(i.inventory_code, i.id::text) ASC`;
 
   const sortSql = (() => {
     switch (normalizedSort) {
@@ -1820,13 +1930,13 @@ export async function listStockDiscsFromDatabase(input: {
       case "format":
         return `i.format ${sortDirection}, ${sortTitleFallbackSql}`;
       case "primary":
-        return `COALESCE(primary_info.is_primary, FALSE) ${sortDirection}, COALESCE(i.inventory_code, i.id::text) DESC, ${sortTitleFallbackSql}`;
+        return `COALESCE(primary_info.is_primary, TRUE) ${sortDirection}, COALESCE(i.inventory_code, i.id::text) DESC, ${sortTitleFallbackSql}`;
       case "availability":
         return `i.availability ${sortDirection}, ${sortTitleFallbackSql}`;
       case "titles":
         return `${sortTitleFallbackSql}`;
       case "order":
-        return `COALESCE(collection_info.anchor_sort_title, primary_title.sort_title, primary_title.title, '') ${sortDirection}, COALESCE(collection_info.first_position, 0) ASC, primary_title.sort_title ASC, primary_title.title ASC, COALESCE(i.inventory_code, i.id::text) ASC`;
+        return `COALESCE(collection_info.anchor_sort_title, primary_title.sort_title, primary_title.title, linked_release.sort_title, linked_release.title, '') ${sortDirection}, COALESCE(collection_info.first_position, 0) ASC, primary_title.sort_title ASC, primary_title.title ASC, linked_release.sort_title ASC, linked_release.title ASC, COALESCE(i.inventory_code, i.id::text) ASC`;
       case "location":
         return `i.zone ${sortDirection}, i.section ${sortDirection}, i.row ${sortDirection} NULLS LAST, ${sortTitleFallbackSql}`;
       case "reviewed":
@@ -1843,8 +1953,6 @@ export async function listStockDiscsFromDatabase(input: {
     `
       SELECT COUNT(DISTINCT i.id)::text AS count
       FROM inventory_items i
-      INNER JOIN inventory_item_titles itt ON itt.inventory_item_id = i.id
-      INNER JOIN titles t ON t.id = itt.title_id
       ${whereClause};
     `,
     values,
@@ -1865,7 +1973,7 @@ export async function listStockDiscsFromDatabase(input: {
         i.sealed,
         i.availability,
         i.reviewed,
-        COALESCE(primary_info.is_primary, FALSE) AS is_primary,
+        COALESCE(primary_info.is_primary, TRUE) AS is_primary,
         ${searchRankSql}::numeric AS search_rank,
         i.zone::text,
         (SELECT z.label FROM inventory_zones z WHERE z.code = i.zone) AS zone_label,
@@ -1896,13 +2004,35 @@ export async function listStockDiscsFromDatabase(input: {
           ) FILTER (WHERE t.id IS NOT NULL),
           '[]'::jsonb
         ) AS linked_titles,
-        COALESCE(collection_info.anchor_title, primary_title.title, '') AS sort_label,
-        COALESCE(collection_info.anchor_sort_title, primary_title.sort_title, primary_title.title, '') AS sort_anchor,
+        (
+          SELECT JSONB_BUILD_OBJECT(
+            'id', mr.id,
+            'source', mr.source,
+            'discogs_release_id', mr.discogs_release_id,
+            'title', mr.title,
+            'sort_title', mr.sort_title,
+            'artist_credit', mr.artist_credit,
+            'release_year', mr.release_year,
+            'discogs_url', mr.discogs_url
+          )
+          FROM inventory_item_music_releases imr
+          INNER JOIN music_releases mr ON mr.id = imr.music_release_id
+          WHERE imr.inventory_item_id = i.id
+        ) AS linked_music_release,
+        COALESCE(collection_info.anchor_title, primary_title.title, linked_release.title, '') AS sort_label,
+        COALESCE(collection_info.anchor_sort_title, primary_title.sort_title, primary_title.title, linked_release.sort_title, linked_release.title, '') AS sort_anchor,
         COALESCE(collection_info.first_position, 0) AS sort_sequence,
         collection_info.collection_name
       FROM inventory_items i
-      INNER JOIN inventory_item_titles itt ON itt.inventory_item_id = i.id
-      INNER JOIN titles t ON t.id = itt.title_id
+      LEFT JOIN inventory_item_titles itt ON itt.inventory_item_id = i.id
+      LEFT JOIN titles t ON t.id = itt.title_id
+      LEFT JOIN LATERAL (
+        SELECT mr.title, mr.sort_title
+        FROM inventory_item_music_releases imr
+        INNER JOIN music_releases mr ON mr.id = imr.music_release_id
+        WHERE imr.inventory_item_id = i.id
+        LIMIT 1
+      ) AS linked_release ON TRUE
       LEFT JOIN LATERAL (
         SELECT
           t0.title,
@@ -1947,7 +2077,7 @@ export async function listStockDiscsFromDatabase(input: {
         WHERE itt0.inventory_item_id = i.id
       ) AS primary_info ON TRUE
       ${whereClause}
-      GROUP BY i.id, primary_info.is_primary, primary_title.title, primary_title.sort_title, collection_info.collection_name, collection_info.anchor_title, collection_info.anchor_sort_title, collection_info.first_position
+      GROUP BY i.id, primary_info.is_primary, primary_title.title, primary_title.sort_title, linked_release.title, linked_release.sort_title, collection_info.collection_name, collection_info.anchor_title, collection_info.anchor_sort_title, collection_info.first_position
       ORDER BY ${input.q?.trim() ? "search_rank DESC, " : ""}${sortSql}
       LIMIT $${values.length + 1}::int
       OFFSET $${values.length + 2}::int;

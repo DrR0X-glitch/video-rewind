@@ -169,10 +169,28 @@ function parseInventoryTitleLinks(body: Record<string, unknown>) {
   );
 }
 
+function requireMusicReleaseId(value: unknown) {
+  const musicReleaseId = optionalString(value);
+  if (
+    !musicReleaseId ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(musicReleaseId)
+  ) {
+    throw createHttpError(400, 'Field "music_release_id" is required and must be a UUID');
+  }
+  return musicReleaseId;
+}
+
 export async function createInventoryItemInDatabase(body: Record<string, unknown>) {
   const titleLinks = parseInventoryTitleLinks(body);
   const titleIds = titleLinks.map((link) => link.titleId);
   const format = normalizeFormat(body.format);
+  const musicReleaseId = format === "cd" ? requireMusicReleaseId(body.music_release_id) : null;
+  if (format === "cd" && titleLinks.length > 0) {
+    throw createHttpError(400, "CD inventory items cannot have video title links");
+  }
+  if (format !== "cd" && body.music_release_id !== undefined) {
+    throw createHttpError(400, 'Field "music_release_id" is only valid for CD inventory');
+  }
   const sealed =
     body.sealed !== undefined
       ? normalizeSealed(body.sealed)
@@ -189,16 +207,28 @@ export async function createInventoryItemInDatabase(body: Record<string, unknown
   const lastRentedAt = optionalString(body.last_rented_at);
   const availability =
     body.availability === undefined ? true : normalizeAvailability(body.availability);
-  const reviewed = body.reviewed === undefined ? false : normalizeAvailability(body.reviewed);
+  const reviewed =
+    format === "cd"
+      ? true
+      : body.reviewed === undefined
+        ? false
+        : normalizeAvailability(body.reviewed);
   const dayPrice = body.day_price === undefined ? 0 : normalizeMoney(body.day_price, "day_price");
   const weekendPrice =
     body.weekend_price === undefined ? 0 : normalizeMoney(body.weekend_price, "weekend_price");
   const lateClass = body.late_class === undefined ? 0 : normalizeLateClass(body.late_class);
-  await ensureTitlesExist(titleIds);
+  if (format !== "cd") await ensureTitlesExist(titleIds);
 
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    if (musicReleaseId) {
+      const release = await client.query<{ id: string }>(
+        "SELECT id FROM music_releases WHERE id = $1",
+        [musicReleaseId],
+      );
+      if (release.rowCount === 0) throw createHttpError(404, "Music release not found");
+    }
     await client.query("SELECT pg_advisory_xact_lock(724061, 2)");
     const inventoryCode = await allocateLowestInventoryCode(client);
     const inventoryResult = await client.query<{ id: string; inventory_code: string }>(
@@ -231,6 +261,15 @@ export async function createInventoryItemInDatabase(body: Record<string, unknown
     );
 
     const inventoryItemId = inventoryResult.rows[0].id;
+    if (musicReleaseId) {
+      await client.query(
+        `
+          INSERT INTO inventory_item_music_releases (inventory_item_id, music_release_id)
+          VALUES ($1, $2);
+        `,
+        [inventoryItemId, musicReleaseId],
+      );
+    }
     for (const [index, titleLink] of titleLinks.entries()) {
       await client.query(
         `
@@ -298,6 +337,35 @@ export async function updateInventoryItemInDatabase(id: string, body: Record<str
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    const existing = await client.query<{ format: string; music_release_linked: boolean }>(
+      `
+        SELECT i.format,
+               EXISTS (
+                 SELECT 1 FROM inventory_item_music_releases link
+                 WHERE link.inventory_item_id = i.id
+               ) AS music_release_linked
+        FROM inventory_items i
+        WHERE i.id = $1
+        FOR UPDATE;
+      `,
+      [id],
+    );
+    if (existing.rowCount === 0) throw createHttpError(404, "Inventory item not found");
+    const currentFormat = existing.rows[0]!.format;
+    const nextFormat = updateValues.format ?? currentFormat;
+    if (currentFormat !== "cd" && nextFormat === "cd") {
+      throw createHttpError(409, "Use the CD intake flow to create CD inventory items");
+    }
+    if (currentFormat === "cd" && nextFormat !== "cd" && existing.rows[0]!.music_release_linked) {
+      throw createHttpError(409, "Unlink the music release before changing a CD to another format");
+    }
+    if (nextFormat === "cd" && titleLinks && titleLinks.length > 0) {
+      throw createHttpError(400, "CD inventory items cannot have video title links");
+    }
+    if (nextFormat === "cd" && !existing.rows[0]!.music_release_linked) {
+      throw createHttpError(409, "CD inventory items must be linked to a music release");
+    }
+    const reviewed = nextFormat === "cd" ? true : updateValues.reviewed;
     const result = await client.query(
       `
         UPDATE inventory_items
@@ -325,7 +393,7 @@ export async function updateInventoryItemInDatabase(id: string, body: Record<str
         updateValues.upcEan,
         updateValues.format,
         updateValues.availability,
-        updateValues.reviewed,
+        reviewed,
         updateValues.sealed,
         updateValues.zone,
         updateValues.section,

@@ -52,7 +52,7 @@ export default async function InventoryEditTitlePage(props: PageProps<"/inventor
           </label>
           <label className="checkbox-row">
             <input type="checkbox" name="featured" value="true" defaultChecked={movie.featured} />
-            <span>Featured</span>
+            <span>Featured?</span>
           </label>
           <label className="checkbox-row">
             <input
@@ -61,7 +61,7 @@ export default async function InventoryEditTitlePage(props: PageProps<"/inventor
               value="true"
               defaultChecked={movie.hideFromHomepage}
             />
-            <span>Hide from homepage</span>
+            <span>Hide from homepage?</span>
           </label>
           <button type="submit">Save Title</button>
         </form>

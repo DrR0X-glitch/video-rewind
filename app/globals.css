@@ -105,6 +105,8 @@ button:hover {
 
 input:not([type]),
 input[type="text"],
+input[type="search"],
+input[type="number"],
 select,
 textarea {
   width: 100%;
@@ -112,6 +114,11 @@ textarea {
   background: var(--panel);
   color: var(--text);
   padding: 0.45rem 0.5rem;
+}
+
+input[type="search"] {
+  appearance: none;
+  border-radius: 0;
 }
 
 textarea {
@@ -284,6 +291,141 @@ h2 {
   justify-content: space-between;
   gap: 1rem;
   margin-bottom: 0.75rem;
+}
+
+.new-title-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.new-title-heading h1 {
+  margin-bottom: 0.5rem;
+}
+
+.new-title-cd-link {
+  flex: 0 0 auto;
+  font-size: 0.875rem;
+}
+
+.upc-ean-entry {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 0.5rem;
+}
+
+.upc-ean-entry .barcode-scanner .utility-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.cd-release-preview {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  align-items: start;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.cd-candidate-summary {
+  display: grid;
+  min-width: 0;
+  gap: 0.2rem;
+}
+
+.cd-candidate-summary strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.cd-candidate-metadata {
+  display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
+  column-gap: 0.55rem;
+  row-gap: 0.1rem;
+  font-size: 0.82rem;
+}
+
+.cd-candidate-metadata > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.2;
+}
+
+.cd-release-search .cd-candidate-results {
+  margin-top: 0.65rem;
+}
+
+.cd-confirmation-panel {
+  scroll-margin-top: 1rem;
+}
+
+.cd-sort-title-field {
+  display: grid;
+  max-width: 36rem;
+  gap: 0.3rem;
+  margin-bottom: 0.75rem;
+}
+
+.cd-release-artwork,
+.cd-release-artwork-empty {
+  width: 100%;
+  max-width: 180px;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+
+.cd-release-artwork-empty {
+  display: grid;
+  place-items: center;
+  margin: 0;
+  font-size: 0.8rem;
+}
+
+.cd-track-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cd-track-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.2rem 0;
+  line-height: 1.3;
+}
+
+.cd-track-name {
+  display: flex;
+  min-width: 0;
+  gap: 0.55rem;
+}
+
+.cd-track-position,
+.cd-track-duration {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.cd-track-position {
+  min-width: 2rem;
+}
+
+.cd-track-duration {
+  white-space: nowrap;
+}
+
+.cd-track-heading {
+  margin-top: 0.4rem;
+  padding: 0.15rem 0;
+  font-weight: 700;
 }
 
 .header-actions,
@@ -799,6 +941,20 @@ h2 {
   gap: 0.3rem;
 }
 
+.cd-search-form {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 0.5rem;
+}
+
+.cd-search-form input {
+  min-width: 0;
+}
+
+.cd-search-form button {
+  white-space: nowrap;
+}
+
 .linked-title-fields {
   display: grid;
   gap: 0.5rem;
@@ -814,6 +970,28 @@ h2 {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.6rem;
+}
+
+.price-field-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.price-field-row label {
+  display: grid;
+  min-width: 0;
+  gap: 0.3rem;
+}
+
+input[type="number"] {
+  appearance: textfield;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
 }
 
 .checkbox-row {
@@ -1224,6 +1402,11 @@ th {
   color: var(--bg);
 }
 
+.choice-button-active span {
+  background: var(--text);
+  color: var(--bg);
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
@@ -1270,6 +1453,12 @@ th {
   }
 }
 
+@media (max-width: 520px) {
+  .price-field-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 820px) {
   .movie-rail-shell {
     --items-per-view: 4;
@@ -1291,6 +1480,15 @@ th {
 }
 
 @media (max-width: 620px) {
+  .cd-release-preview {
+    grid-template-columns: 120px minmax(0, 1fr);
+  }
+
+  .cd-release-artwork,
+  .cd-release-artwork-empty {
+    max-width: 120px;
+  }
+
   .movie-rail-shell {
     --items-per-view: 2;
   }

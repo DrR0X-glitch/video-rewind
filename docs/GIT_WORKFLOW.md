@@ -12,7 +12,7 @@ Examples: `feature/manage-locations`, `bugfix/stock-selection`, `chore/versioned
 
 Use only these three prefixes for ordinary work. Do not add release, hotfix, ticket, or agent prefixes unless the user asks. Keep a branch as broad as a cohesive change: one branch can contain multiple related features or bugs intended for the same review and merge; split unrelated work when it makes review or rollback clearer.
 
-When the user requests a whole-update integration branch, name it `release/YYYY-MM-DD` using the date it is created. Create it from the current feature tip that contains the intended changes not yet on `main`. Rebase or merge further feature branches onto this release branch, resolve conflicts there, and run the full local verification gate on the assembled release branch. Merge that branch to `main` once after review and passing checks. The release branch is a temporary integration target, not a version or deployment tag.
+When the user requests a whole-update integration branch, name it `release/YYYY-MM` using the month it is created. Create it from the current feature tip that contains the intended changes not yet on `main`. Rebase or merge further feature branches onto this release branch, resolve conflicts there, and run the full local verification gate on the assembled release branch. Merge that branch to `main` once after review and passing checks. The release branch is a temporary integration target, not a version or deployment tag.
 
 This follows the purpose-prefix and lowercase kebab-case approach in [Conventional Branch](https://conventionalbranch.org/), using only the development prefixes needed for this repository.
 

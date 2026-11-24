@@ -120,6 +120,8 @@ export function formatDiscFormat(format: DiscFormat): string {
       return "4K UHD";
     case "vhs":
       return "VHS";
+    case "cd":
+      return "CD";
     default:
       return "DVD";
   }

@@ -4,6 +4,10 @@ Next.js app for the Video Rewind public site and inventory UI. The app owns the 
 
 ## Development
 
+### Parallel agent work
+
+Use agents proactively when a task has independent, clearly bounded pieces that can safely proceed in parallel; no extra user instruction is needed. Give each agent an explicit scope, avoid overlapping edits to shared files, and review every agent's changes and verification before considering the task complete. Keep coordination and integration with the primary task owner.
+
 1. Copy the example env file for the app and Docker Compose:
 
 ```bash
@@ -147,12 +151,15 @@ pnpm import:stock -- ./path/to/stock.csv --verbose
 - `/contact`
 - `/movies/:id`
 - `/inventory`
+- `/inventory/cds`
+- `/inventory/cds/releases/:id`
 - `/inventory/:id`
 - `/inventory/:id/edit`
 - `/inventory/discs/:id`
 - `/inventory/new`
 - `/inventory/review`
 - `/inventory/stock`
+- `/inventory/stock/cds`
 
 ## API Routes
 
@@ -184,7 +191,7 @@ pnpm import:stock -- ./path/to/stock.csv --verbose
 - New discs start as not reviewed, so they stay off the public site until staff review them.
 - `/inventory/stock` now shows reviewed stock only.
 - `/inventory/review` is the unreviewed queue, with shift-range selection, bulk mark-reviewed, bulk delete, per-row review actions, and sort grouped by Primary then Duplicate.
-- The stock view is a searchable, sortable disc table for reviewed stock with preset links for `All Discs` and `Wall`, visible filters including `Primary`, shift-range row selection, bulk edit/delete actions, pagination, and a `Show All` mode.
+- `/inventory/stock` is a searchable, sortable table for reviewed movie/VHS stock with preset links for `All Discs` and `Wall`, visible filters including `Primary`, shift-range row selection, bulk edit/delete actions, pagination, and a `Show All` mode. CDs are excluded from the standard stock and review views and use the dedicated, no-art `/inventory/stock/cds` view with release and copy-specific fields.
 - Primary/duplicate status is calculated automatically from highest format quality (`4K UHD`, `Blu-ray`, `DVD`) and then lowest `inventory_code`.
 - The public homepage uses horizontal browse rows for featured titles, highest rated movies, popular movies, popular TV, recently returned, and top genres, with a compact search form in the intro panel.
 - Titles can be marked `Hide from homepage` by staff to keep niche items such as concert recordings out of homepage rails without removing them from public search or detail pages.

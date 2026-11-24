@@ -1,4 +1,5 @@
-export type DiscFormat = "dvd" | "blu-ray" | "4k-uhd" | "vhs";
+export type DiscFormat = "dvd" | "blu-ray" | "4k-uhd" | "vhs" | "cd";
+export type PublicDiscFormat = Exclude<DiscFormat, "vhs" | "cd">;
 export type MediaType = "movie" | "series";
 
 export type Movie = {
@@ -35,6 +36,17 @@ export type LinkedTitle = {
   episodeEnd?: number;
 };
 
+export type LinkedMusicRelease = {
+  id: string;
+  source: "discogs" | "manual";
+  discogsReleaseId: number | null;
+  title: string;
+  sortTitle: string;
+  artistCredit: string;
+  releaseYear: number | null;
+  discogsUrl: string | null;
+};
+
 export type TitleCollection = {
   id: string;
   name: string;
@@ -55,6 +67,7 @@ export type InventoryItem = {
   row: string;
   locationCode: string;
   linkedTitles: LinkedTitle[];
+  linkedMusicRelease?: LinkedMusicRelease;
   notes?: string;
   lastRentedAt?: string;
   dayPrice: number;
@@ -62,6 +75,8 @@ export type InventoryItem = {
   lateClass: number;
   updatedAt?: string;
 };
+
+export type PublicInventoryItem = Omit<InventoryItem, "format"> & { format: PublicDiscFormat };
 
 export type StockViewDisc = InventoryItem & {
   collectionName?: string;
@@ -87,4 +102,8 @@ export type MovieWithInventory = Movie & {
   totalCopies: number;
   collection?: TitleCollection;
   collectionTitles: LinkedTitle[];
+};
+
+export type PublicMovieWithInventory = Omit<MovieWithInventory, "inventoryItems"> & {
+  inventoryItems: PublicInventoryItem[];
 };

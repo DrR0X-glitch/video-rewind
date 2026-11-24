@@ -56,6 +56,10 @@ describe("local PostgreSQL setup", () => {
       "0004_inventory_upc_ean.sql",
       "0005_required_title_year.sql",
       "0006_vhs_inventory_format.sql",
+      "0007_cd_catalog.sql",
+      "0008_manual_music_releases.sql",
+      "0009_music_release_sort_title.sql",
+      "0010_cd_review_bypass.sql",
     ]);
     expect(result.rows.every((row) => /^[a-f0-9]{64}$/.test(row.checksum))).toBe(true);
   });
@@ -77,10 +81,36 @@ describe("local PostgreSQL setup", () => {
     `);
 
     expect(result.rows[0]?.title_count).toBe("10");
-    expect(result.rows[0]?.item_count).toBe("10");
+    expect(Number(result.rows[0]?.item_count)).toBeGreaterThanOrEqual(10);
     expect(Number(result.rows[0]?.link_count)).toBeGreaterThanOrEqual(10);
     expect(result.rows[0]?.known_zone_count).toBe("3");
     expect(result.rows[0]?.active_known_zone_count).toBe("3");
+  });
+
+  it("marks existing CD copies reviewed without changing movie copies", async () => {
+    const client = await pool!.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(`
+        CREATE TEMP TABLE inventory_items (format TEXT, reviewed BOOLEAN);
+        INSERT INTO inventory_items (format, reviewed) VALUES ('cd', FALSE), ('dvd', FALSE);
+      `);
+      const migration = await readFile(
+        new URL("../../db/migrations/0010_cd_review_bypass.sql", import.meta.url),
+        "utf8",
+      );
+      await client.query(migration);
+      const result = await client.query<{ format: string; reviewed: boolean }>(
+        "SELECT format, reviewed FROM inventory_items ORDER BY format",
+      );
+      expect(result.rows).toEqual([
+        { format: "cd", reviewed: true },
+        { format: "dvd", reviewed: false },
+      ]);
+    } finally {
+      await client.query("ROLLBACK");
+      client.release();
+    }
   });
 
   it("requires a release year and a non-empty sort title", async () => {

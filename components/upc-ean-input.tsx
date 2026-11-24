@@ -8,7 +8,7 @@ export function UpcEanInput({ defaultValue = "" }: { defaultValue?: string }) {
   const [value, setValue] = useState(defaultValue);
 
   return (
-    <>
+    <div className="upc-ean-entry">
       <label>
         UPC/EAN barcode (optional)
         <input
@@ -22,6 +22,6 @@ export function UpcEanInput({ defaultValue = "" }: { defaultValue?: string }) {
         />
       </label>
       <UpcEanScanner onDetected={setValue} />
-    </>
+    </div>
   );
 }
