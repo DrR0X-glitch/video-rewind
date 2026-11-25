@@ -8,9 +8,9 @@ import {
   formatInventoryLocation,
   formatInventoryIdentifier,
   formatLinkedTitleLabel,
-  formatLongDate,
   formatMediaType,
   formatMovieTitleWithYear,
+  formatReleaseYear,
   formatSealed,
   getAvailabilityLabel,
   getAvailabilityTone,
@@ -27,11 +27,11 @@ export default async function InventoryTitlePage(props: PageProps<"/inventory/[i
       <section className="panel section">
         <div className="section-heading">
           <div>
-            <h1>{formatMovieTitleWithYear(movie.title, movie.releaseDate)}</h1>
+            <h1>{formatMovieTitleWithYear(movie.title, movie.releaseYear)}</h1>
             <p className="muted">
               {formatMediaType(movie.mediaType)} |{" "}
-              {movie.mediaType === "series" ? "First aired" : "Released"}{" "}
-              {formatLongDate(movie.releaseDate)} | Sort title {movie.sortTitle}
+              {movie.mediaType === "series" ? "First aired" : "Released"} Release year{" "}
+              {formatReleaseYear(movie.releaseYear)} | Sort title {movie.sortTitle}
             </p>
           </div>
           <div className="header-actions">

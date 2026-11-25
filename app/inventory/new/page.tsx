@@ -39,7 +39,7 @@ export default async function InventoryNewPage({ searchParams }: InventoryNewPag
         tmdbId: tmdbDraft.tmdbId,
         mediaType: tmdbDraft.mediaType,
         title: tmdbDraft.title,
-        releaseDate: tmdbDraft.releaseDate,
+        releaseYear: Number(tmdbDraft.releaseDate.slice(0, 4)) || undefined,
       }).catch(() => null)
     : null;
   const duplicateMovie =
@@ -53,7 +53,12 @@ export default async function InventoryNewPage({ searchParams }: InventoryNewPag
   return (
     <div className="inventory-layout">
       <section className="panel section">
-        <h1>Find or create a title</h1>
+        <div className="new-title-heading">
+          <h1>Find or create a title</h1>
+          <Link className="new-title-cd-link" href="/inventory/new/cd">
+            New CD
+          </Link>
+        </div>
         <p className="muted">
           Search first. If the title exists, add a copy to it. If not, create it from TMDB.
         </p>

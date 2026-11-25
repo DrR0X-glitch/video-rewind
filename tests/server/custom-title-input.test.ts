@@ -3,12 +3,13 @@ import { describe, expect, it } from "vitest";
 import { CustomTitleInputError, normalizeCustomTitleInput } from "@/lib/catalog/custom-title-input";
 
 describe("custom title input", () => {
-  it("normalizes manual title metadata and suggests a sort title", () => {
+  it("normalizes manually entered required metadata", () => {
     expect(
       normalizeCustomTitleInput({
         title: "  The Shop Around the Corner  ",
+        sortTitle: "Shop Around the Corner",
         mediaType: "movie",
-        releaseDate: "1940-01-12",
+        releaseYear: "1940",
         genres: "Comedy, Romance, comedy",
         director: "Ernst Lubitsch",
       }),
@@ -16,32 +17,25 @@ describe("custom title input", () => {
       title: "The Shop Around the Corner",
       sortTitle: "Shop Around the Corner",
       mediaType: "movie",
-      releaseDate: "1940-01-12",
+      releaseYear: 1940,
       overview: "",
       genres: ["Comedy", "Romance"],
       director: "Ernst Lubitsch",
     });
   });
 
-  it("accepts manual TV series titles and a supplied sort title", () => {
-    expect(
-      normalizeCustomTitleInput({
-        title: "Mini Series",
-        sortTitle: "Series, Mini",
-        mediaType: "series",
-      }),
-    ).toMatchObject({
-      title: "Mini Series",
-      sortTitle: "Series, Mini",
-      mediaType: "series",
-      releaseDate: null,
-    });
-  });
-
   it.each([
-    [{ title: "", mediaType: "movie" }, "title"],
-    [{ title: "Sample", mediaType: "documentary" }, "mediaType"],
-    [{ title: "Sample", mediaType: "movie", releaseDate: "2026-02-30" }, "releaseDate"],
+    [{ title: "", mediaType: "movie", sortTitle: "A", releaseYear: 2020 }, "title"],
+    [
+      { title: "Sample", mediaType: "documentary", sortTitle: "Sample", releaseYear: 2020 },
+      "mediaType",
+    ],
+    [{ title: "Sample", mediaType: "movie", releaseYear: 2020 }, "sortTitle"],
+    [{ title: "Sample", mediaType: "movie", sortTitle: "Sample" }, "releaseYear"],
+    [
+      { title: "Sample", mediaType: "movie", sortTitle: "Sample", releaseYear: "20" },
+      "releaseYear",
+    ],
   ] as const)("rejects invalid input %j", (input, field) => {
     let error: unknown;
     try {
@@ -49,7 +43,6 @@ describe("custom title input", () => {
     } catch (caught) {
       error = caught;
     }
-
     expect(error).toBeInstanceOf(CustomTitleInputError);
     expect(error).toMatchObject({ field });
   });

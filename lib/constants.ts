@@ -1,4 +1,4 @@
-export const FORMAT_OPTIONS = ["dvd", "blu-ray", "4k-uhd"] as const;
+export const FORMAT_OPTIONS = ["dvd", "blu-ray", "4k-uhd", "vhs"] as const;
 
 export function formatZoneLabel(
   zone: string,

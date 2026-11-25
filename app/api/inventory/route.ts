@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 import { searchInventoryTitlesPage } from "@/lib/data";
-import { createInventoryItemInDatabase } from "@/lib/server/store";
+import { createInventoryItemInDatabase } from "@/lib/server/inventory/items";
 import { ensureObject, jsonError, parseInteger } from "@/lib/server/http";
 
 export async function GET(request: NextRequest) {

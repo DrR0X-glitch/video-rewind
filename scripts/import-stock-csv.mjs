@@ -326,6 +326,9 @@ async function ensureTitle(client, tmdbUrl, tmdbToken) {
   }
 
   const draft = await fetchTmdbTitleDraft(tmdbUrl, tmdbToken);
+  if (!draft.releaseDate || !/^\d{4}/.test(draft.releaseDate)) {
+    throw new Error(`A release year is required for TMDB title ${draft.title} (${tmdbUrl})`);
+  }
   const insertResult = await client.query(
     `
       INSERT INTO titles (
@@ -335,6 +338,7 @@ async function ensureTitle(client, tmdbUrl, tmdbToken) {
         title,
         sort_title,
         overview,
+        release_year,
         release_date,
         poster_path,
         genres,
@@ -348,11 +352,12 @@ async function ensureTitle(client, tmdbUrl, tmdbToken) {
         $4,
         $5,
         $6,
-        NULLIF($7, '')::date,
-        $8,
-        $9::text[],
-        $10,
-        $11::jsonb
+        $7,
+        NULLIF($8, '')::date,
+        $9,
+        $10::text[],
+        $11,
+        $12::jsonb
       )
       ON CONFLICT (tmdb_id, media_type) DO NOTHING
       RETURNING id, title
@@ -362,8 +367,9 @@ async function ensureTitle(client, tmdbUrl, tmdbToken) {
       draft.imdbId || null,
       draft.mediaType,
       draft.title,
-      draft.sortTitle,
+      draft.sortTitle || draft.title,
       draft.overview,
+      draft.releaseDate ? Number(draft.releaseDate.slice(0, 4)) : null,
       draft.releaseDate,
       draft.posterPath,
       draft.genres,

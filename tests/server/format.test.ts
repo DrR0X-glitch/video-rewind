@@ -11,6 +11,8 @@ import { formatZoneLabel } from "../../lib/constants";
 describe("catalogue and inventory formatting", () => {
   it("formats a release year and handles an invalid date", () => {
     expect(formatReleaseYear("1999-03-31")).toBe("1999");
+    expect(formatReleaseYear("0001-01-01")).toBe("0001");
+    expect(formatReleaseYear(1)).toBe("0001");
     expect(formatReleaseYear("not-a-date")).toBe("Unknown");
     expect(formatMovieTitleWithYear("The Matrix", "1999-03-31")).toBe("The Matrix (1999)");
   });
@@ -25,7 +27,7 @@ describe("catalogue and inventory formatting", () => {
     expect(
       formatLinkedTitleLabel({
         title: "Example Series",
-        releaseDate: "2020-01-01",
+        releaseYear: 2020,
         mediaType: "series",
         seasonStart: 1,
         seasonEnd: 2,
@@ -37,6 +39,7 @@ describe("catalogue and inventory formatting", () => {
 
   it("maps disc formats and storage zones to display labels", () => {
     expect(formatDiscFormat("4k-uhd")).toBe("4K UHD");
+    expect(formatDiscFormat("vhs")).toBe("VHS");
     expect(formatZoneLabel("W")).toBe("Wall");
   });
 });

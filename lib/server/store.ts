@@ -1,9 +1,14 @@
 import "server-only";
 
 import { formatZoneLabel } from "@/lib/constants";
-import { parseInventoryZoneIdentifier } from "@/lib/inventory-zones";
+import { normalizeReleaseYearInput, ReleaseYearInputError } from "@/lib/catalog/release-year-input";
 import { pool } from "@/lib/server/db";
 import { fetchOmdbTitleMetadataByImdbId } from "@/lib/server/omdb";
+import {
+  normalizeInventoryLocationPart as normalizeLocationPart,
+  normalizeInventoryRow as normalizeRowPart,
+  normalizeInventoryZone as normalizeZone,
+} from "@/lib/server/inventory/location-input";
 import { assertInventoryZoneIsAssignable } from "@/lib/server/inventory/zones";
 import {
   createHttpError,
@@ -12,20 +17,15 @@ import {
   formatPosterUrl,
   normalizeAvailability,
   normalizeCast,
-  normalizeFormat,
-  normalizeLateClass,
   normalizeMediaType,
-  normalizeMoney,
-  normalizeSealed,
   optionalString,
 } from "@/lib/server/http";
 import type {
   InventoryItem,
   LinkedTitle,
   MovieWithInventory,
-  StockViewDisc,
-  StockViewPage,
-  StockViewSection,
+  PublicInventoryItem,
+  PublicMovieWithInventory,
   TitleCollection,
 } from "@/lib/types";
 import type { TmdbCollectionDraft } from "@/lib/server/tmdb";
@@ -36,6 +36,7 @@ type MovieFilters = {
   decade?: number | "pre-1950" | null;
   available?: boolean;
   reviewedOnly?: boolean;
+  publicOnly?: boolean;
   mediaType?: "movie" | "series";
   excludeHomepageHidden?: boolean;
   limit?: number;
@@ -50,6 +51,12 @@ const TITLE_SEARCH_VECTOR_SQL = `
     setweight(to_tsvector('simple', COALESCE(t.sort_title, '')), 'A')
   )
 `;
+
+const PUBLIC_FORMATS_SQL = "i.format IN ('dvd', 'blu-ray', '4k-uhd')";
+
+function isPublicInventoryItem(item: InventoryItem): item is PublicInventoryItem {
+  return item.format === "dvd" || item.format === "blu-ray" || item.format === "4k-uhd";
+}
 
 const TITLE_METADATA_SEARCH_VECTOR_SQL = `
   (
@@ -72,13 +79,6 @@ const TITLE_METADATA_SEARCH_VECTOR_SQL = `
       ),
       'C'
     )
-  )
-`;
-
-const STOCK_TITLE_SEARCH_VECTOR_SQL = `
-  (
-    setweight(to_tsvector('simple', COALESCE(tq.title, '')), 'A') ||
-    setweight(to_tsvector('simple', COALESCE(tq.sort_title, '')), 'A')
   )
 `;
 
@@ -110,6 +110,7 @@ type TitleRow = {
   sort_title: string;
   overview: string;
   release_date: string | Date | null;
+  release_year: number;
   poster_path: string | null;
   genres: string[] | null;
   director: string;
@@ -125,6 +126,7 @@ type TitleRow = {
 type InventoryItemRow = {
   id: string;
   inventory_code: string | null;
+  upc_ean: string | null;
   format: string;
   sealed: boolean;
   availability: boolean;
@@ -146,11 +148,23 @@ type InventoryItemRow = {
     sort_title?: string | null;
     media_type: "movie" | "series";
     release_date: string | Date | null;
+    release_year: number;
+    poster_path?: string | null;
     season_start?: number | null;
     season_end?: number | null;
     episode_start?: number | null;
     episode_end?: number | null;
   }>;
+  linked_music_release?: {
+    id: string;
+    source: "discogs" | "manual";
+    discogs_release_id: string | number | null;
+    title: string;
+    sort_title: string;
+    artist_credit: string;
+    release_year: number | null;
+    discogs_url: string | null;
+  } | null;
 };
 
 type CollectionRow = {
@@ -169,48 +183,11 @@ type CollectionTitleRow = {
   sort_title: string;
   media_type: "movie" | "series";
   release_date: string | Date | null;
-};
-
-type StockDiscRow = InventoryItemRow & {
-  is_primary: boolean;
-  sort_label: string;
-  sort_anchor: string;
-  sort_sequence: number;
-  collection_name: string | null;
+  release_year: number;
 };
 
 function getSuggestedSortTitle(title: string) {
   return title.replace(/^(a|an|the)\s+/i, "").trim() || title.trim();
-}
-
-function buildLocationCode(zone: string, section: string, row: string) {
-  return `${zone}/${section}${row}`;
-}
-
-function getFormatPrioritySql(column: string) {
-  return `(CASE ${column}::text WHEN '4k-uhd' THEN 0 WHEN 'blu-ray' THEN 1 ELSE 2 END)`;
-}
-
-async function allocateLowestInventoryCode(client: { query: typeof pool.query }) {
-  const result = await client.query<{ inventory_code: string }>(
-    `
-      SELECT LPAD(candidate.code::text, 6, '0') AS inventory_code
-      FROM generate_series(1, 999999) AS candidate(code)
-      LEFT JOIN inventory_items i
-        ON i.inventory_code = LPAD(candidate.code::text, 6, '0')
-      WHERE i.inventory_code IS NULL
-      ORDER BY candidate.code ASC
-      LIMIT 1;
-    `,
-  );
-
-  const inventoryCode = result.rows[0]?.inventory_code;
-
-  if (!inventoryCode) {
-    throw createHttpError(409, "No disc codes are available");
-  }
-
-  return inventoryCode;
 }
 
 function getPosterColor(title: string) {
@@ -219,61 +196,14 @@ function getPosterColor(title: string) {
   return palette[total % palette.length];
 }
 
-function normalizeZone(value: unknown) {
-  const raw = optionalString(value) ?? "";
-  const normalized =
-    raw.toLowerCase() === "shed"
-      ? "S"
-      : raw.toLowerCase() === "display"
-        ? "D"
-        : raw.toLowerCase() === "wall"
-          ? "W"
-          : raw.toUpperCase();
-
-  const parsed = parseInventoryZoneIdentifier(normalized);
-  if (!normalized) {
-    throw createHttpError(400, 'Field "zone" is required');
-  }
-  if (!parsed) {
-    throw createHttpError(400, 'Field "zone" is invalid');
-  }
-  return parsed;
-}
-
-function normalizeLocationPart(value: unknown, fieldName: "section" | "row") {
-  const normalized = optionalString(value)?.toUpperCase() ?? "";
-
-  if (!normalized) {
-    throw createHttpError(400, `Field "${fieldName}" is required`);
-  }
-
-  if (normalized.length < 1 || normalized.length > 2) {
-    throw createHttpError(400, `Field "${fieldName}" must be 1 or 2 characters`);
-  }
-
-  return normalized;
-}
-
-function normalizeRowPart(value: unknown) {
-  const normalized = optionalString(value)?.toUpperCase() ?? "";
-
-  if (!normalized) {
-    return "00";
-  }
-
-  if (normalized.length < 1 || normalized.length > 2) {
-    throw createHttpError(400, 'Field "row" must be 1 or 2 characters when provided');
-  }
-
-  return normalized;
-}
-
 function toUiLinkedTitle(title: {
   id: string;
   title: string;
   sort_title?: string | null;
   media_type: "movie" | "series";
   release_date: string | Date | null;
+  release_year: number;
+  poster_path?: string | null;
   season_start?: number | null;
   season_end?: number | null;
   episode_start?: number | null;
@@ -285,6 +215,8 @@ function toUiLinkedTitle(title: {
     sortTitle: title.sort_title || getSuggestedSortTitle(title.title),
     mediaType: title.media_type,
     releaseDate: formatDateOnly(title.release_date) ?? "",
+    releaseYear: Number(title.release_year),
+    posterUrl: formatPosterUrl(title.poster_path ?? null, "list"),
     seasonStart: typeof title.season_start === "number" ? title.season_start : undefined,
     seasonEnd: typeof title.season_end === "number" ? title.season_end : undefined,
     episodeStart: typeof title.episode_start === "number" ? title.episode_start : undefined,
@@ -296,12 +228,17 @@ function toUiInventoryItem(item: InventoryItemRow): InventoryItem {
   return {
     id: item.id,
     inventoryCode: item.inventory_code ?? "",
+    upcEan: item.upc_ean,
     format:
       item.format.toLowerCase() === "blu-ray"
         ? "blu-ray"
         : item.format.toLowerCase() === "4k-uhd"
           ? "4k-uhd"
-          : "dvd",
+          : item.format.toLowerCase() === "vhs"
+            ? "vhs"
+            : item.format.toLowerCase() === "cd"
+              ? "cd"
+              : "dvd",
     sealed: Boolean(item.sealed),
     availability: item.availability,
     reviewed: item.reviewed,
@@ -311,6 +248,21 @@ function toUiInventoryItem(item: InventoryItemRow): InventoryItem {
     row: item.row,
     locationCode: item.location_code,
     linkedTitles: Array.isArray(item.linked_titles) ? item.linked_titles.map(toUiLinkedTitle) : [],
+    linkedMusicRelease: item.linked_music_release
+      ? {
+          id: item.linked_music_release.id,
+          source: item.linked_music_release.source,
+          discogsReleaseId:
+            item.linked_music_release.discogs_release_id === null
+              ? null
+              : Number(item.linked_music_release.discogs_release_id),
+          title: item.linked_music_release.title,
+          sortTitle: item.linked_music_release.sort_title,
+          artistCredit: item.linked_music_release.artist_credit,
+          releaseYear: item.linked_music_release.release_year,
+          discogsUrl: item.linked_music_release.discogs_url,
+        }
+      : undefined,
     notes: item.notes,
     lastRentedAt: formatDateOnly(item.last_rented_at) ?? undefined,
     dayPrice: Number(item.day_price),
@@ -338,6 +290,7 @@ function toUiTitle(row: TitleRow, inventoryItems: InventoryItem[] = []): MovieWi
     sortTitle: row.sort_title || getSuggestedSortTitle(row.title),
     overview: row.overview ?? "",
     releaseDate: formatDateOnly(row.release_date) ?? "",
+    releaseYear: Number(row.release_year),
     posterUrl: formatPosterUrl(row.poster_path, "detail"),
     posterColor: getPosterColor(row.title),
     genres: row.genres ?? [],
@@ -480,12 +433,12 @@ function buildListTitlesQuery(filters: MovieFilters) {
   if (filters.decade) {
     if (filters.decade === "pre-1950") {
       values.push(1950);
-      conditions.push(`t.release_date < MAKE_DATE($${values.length}, 1, 1)`);
+      conditions.push(`t.release_year < $${values.length}`);
     } else {
       values.push(filters.decade);
       values.push(filters.decade + 10);
       conditions.push(
-        `t.release_date >= MAKE_DATE($${values.length - 1}, 1, 1) AND t.release_date < MAKE_DATE($${values.length}, 1, 1)`,
+        `t.release_year >= $${values.length - 1} AND t.release_year < $${values.length}`,
       );
     }
   }
@@ -510,9 +463,9 @@ function buildListTitlesQuery(filters: MovieFilters) {
         : filters.sort === "popular"
           ? "ORDER BY COUNT(DISTINCT i.id) DESC, MAX(i.last_rented_at) DESC NULLS LAST, t.imdb_rating DESC NULLS LAST, t.sort_title ASC"
           : filters.sort === "year-desc"
-            ? "ORDER BY t.release_date DESC NULLS LAST, t.sort_title ASC, t.title ASC"
+            ? "ORDER BY t.release_year DESC, t.sort_title ASC, t.title ASC"
             : filters.sort === "year-asc"
-              ? "ORDER BY t.release_date ASC NULLS LAST, t.sort_title ASC, t.title ASC"
+              ? "ORDER BY t.release_year ASC, t.sort_title ASC, t.title ASC"
               : "ORDER BY t.sort_title ASC, t.title ASC";
 
   return {
@@ -527,6 +480,7 @@ function buildListTitlesQuery(filters: MovieFilters) {
         t.sort_title,
         t.overview,
         t.release_date,
+        t.release_year,
         t.poster_path,
         t.genres,
         t.director,
@@ -540,6 +494,7 @@ function buildListTitlesQuery(filters: MovieFilters) {
       FROM titles t
       LEFT JOIN inventory_item_titles itt ON itt.title_id = t.id
       LEFT JOIN inventory_items i ON i.id = itt.inventory_item_id
+        ${filters.publicOnly ? `AND ${PUBLIC_FORMATS_SQL}` : ""}
       ${whereClause}
       GROUP BY t.id
       ${
@@ -558,13 +513,18 @@ function buildListTitlesQuery(filters: MovieFilters) {
   };
 }
 
-async function getInventoryItemsForTitle(titleId: string, options?: { reviewedOnly?: boolean }) {
+async function getInventoryItemsForTitle(
+  titleId: string,
+  options?: { reviewedOnly?: boolean; publicOnly?: boolean },
+) {
   const reviewedClause = options?.reviewedOnly ? "AND i.reviewed = TRUE" : "";
+  const publicFormatClause = options?.publicOnly ? `AND ${PUBLIC_FORMATS_SQL}` : "";
   const result = await pool.query<InventoryItemRow>(
     `
       SELECT
         i.id,
         i.inventory_code,
+        i.upc_ean,
         i.format::text,
         i.sealed,
         i.availability,
@@ -588,6 +548,8 @@ async function getInventoryItemsForTitle(titleId: string, options?: { reviewedOn
               'sort_title', t2.sort_title,
               'media_type', t2.media_type::text,
               'release_date', t2.release_date,
+              'release_year', t2.release_year,
+              'poster_path', t2.poster_path,
               'season_start', itt2.season_start,
               'season_end', itt2.season_end,
               'episode_start', itt2.episode_start,
@@ -603,6 +565,7 @@ async function getInventoryItemsForTitle(titleId: string, options?: { reviewedOn
       LEFT JOIN titles t2 ON t2.id = itt2.title_id
       WHERE itt.title_id = $1
       ${reviewedClause}
+      ${publicFormatClause}
       GROUP BY i.id
       ORDER BY i.created_at ASC;
     `,
@@ -612,20 +575,9 @@ async function getInventoryItemsForTitle(titleId: string, options?: { reviewedOn
   return result.rows.map(toUiInventoryItem);
 }
 
-function toUiStockDisc(item: StockDiscRow): StockViewDisc {
-  return {
-    ...toUiInventoryItem(item),
-    collectionName: item.collection_name ?? undefined,
-    isPrimary: Boolean(item.is_primary),
-    sortLabel: item.sort_label,
-    sortAnchor: item.sort_anchor,
-    sortSequence: item.sort_sequence,
-  };
-}
-
 async function getCollectionDataForTitle(
   titleId: string,
-  options?: { reviewedOnly?: boolean },
+  options?: { reviewedOnly?: boolean; publicOnly?: boolean },
 ): Promise<{
   collection?: TitleCollection;
   collectionTitles: LinkedTitle[];
@@ -638,6 +590,7 @@ async function getCollectionDataForTitle(
         INNER JOIN inventory_items visible_i ON visible_i.id = visible_itt.inventory_item_id
         WHERE visible_itt.title_id = t.id
           AND visible_i.reviewed = TRUE
+          ${options?.publicOnly ? `AND ${PUBLIC_FORMATS_SQL.replaceAll("i.", "visible_i.")}` : ""}
       )
     `
     : "";
@@ -651,14 +604,15 @@ async function getCollectionDataForTitle(
         t.title,
         t.sort_title,
         t.media_type,
-        t.release_date
+        t.release_date,
+        t.release_year
       FROM collection_titles current_ct
       INNER JOIN collections c ON c.id = current_ct.collection_id
       INNER JOIN collection_titles ct ON ct.collection_id = c.id
       INNER JOIN titles t ON t.id = ct.title_id
       WHERE current_ct.title_id = $1
       ${reviewedCondition}
-      ORDER BY ct.position ASC, t.release_date ASC NULLS LAST, t.sort_title ASC, t.title ASC;
+      ORDER BY ct.position ASC, t.release_year ASC, t.sort_title ASC, t.title ASC;
     `,
     [titleId],
   );
@@ -683,6 +637,7 @@ async function getCollectionDataForTitle(
         sort_title: row.sort_title,
         media_type: row.media_type,
         release_date: row.release_date,
+        release_year: row.release_year,
       }),
     ),
   };
@@ -694,6 +649,7 @@ export async function getInventoryItemById(id: string) {
       SELECT
         i.id,
         i.inventory_code,
+        i.upc_ean,
         i.format::text,
         i.sealed,
         i.availability,
@@ -717,6 +673,8 @@ export async function getInventoryItemById(id: string) {
               'sort_title', t.sort_title,
               'media_type', t.media_type::text,
               'release_date', t.release_date,
+              'release_year', t.release_year,
+              'poster_path', t.poster_path,
               'season_start', itt.season_start,
               'season_end', itt.season_end,
               'episode_start', itt.episode_start,
@@ -725,7 +683,22 @@ export async function getInventoryItemById(id: string) {
             ORDER BY itt.position ASC, t.sort_title ASC
           ) FILTER (WHERE t.id IS NOT NULL),
           '[]'::jsonb
-        ) AS linked_titles
+        ) AS linked_titles,
+        (
+          SELECT JSONB_BUILD_OBJECT(
+            'id', mr.id,
+            'source', mr.source,
+            'discogs_release_id', mr.discogs_release_id,
+            'title', mr.title,
+            'sort_title', mr.sort_title,
+            'artist_credit', mr.artist_credit,
+            'release_year', mr.release_year,
+            'discogs_url', mr.discogs_url
+          )
+          FROM inventory_item_music_releases imr
+          INNER JOIN music_releases mr ON mr.id = imr.music_release_id
+          WHERE imr.inventory_item_id = i.id
+        ) AS linked_music_release
       FROM inventory_items i
       LEFT JOIN inventory_item_titles itt ON itt.inventory_item_id = i.id
       LEFT JOIN titles t ON t.id = itt.title_id
@@ -745,160 +718,6 @@ export async function getInventoryItemById(id: string) {
   return toUiInventoryItem(item);
 }
 
-async function ensureTitlesExist(titleIds: string[]) {
-  if (titleIds.length === 0) {
-    throw createHttpError(400, 'Field "title_ids" must include at least one title');
-  }
-
-  const result = await pool.query<{ id: string }>(
-    `SELECT id FROM titles WHERE id = ANY($1::uuid[])`,
-    [titleIds],
-  );
-
-  if (result.rowCount !== titleIds.length) {
-    throw createHttpError(404, "One or more titles were not found");
-  }
-}
-
-function normalizeOptionalSeasonNumber(value: unknown, fieldName: string) {
-  if (value === undefined || value === null || value === "") {
-    return null;
-  }
-
-  if (typeof value === "number" && Number.isInteger(value) && value > 0) {
-    return value;
-  }
-
-  if (typeof value === "string" && value.trim() !== "") {
-    const parsed = Number.parseInt(value, 10);
-
-    if (Number.isInteger(parsed) && parsed > 0) {
-      return parsed;
-    }
-  }
-
-  throw createHttpError(400, `Field "${fieldName}" is invalid`);
-}
-
-function validateSeasonRange(title: {
-  titleId: string;
-  seasonStart: number | null;
-  seasonEnd: number | null;
-  episodeStart: number | null;
-  episodeEnd: number | null;
-}) {
-  if (title.seasonEnd !== null && title.seasonStart === null) {
-    throw createHttpError(400, 'Field "season_end" requires "season_start"');
-  }
-
-  if (
-    title.seasonStart !== null &&
-    title.seasonEnd !== null &&
-    title.seasonEnd < title.seasonStart
-  ) {
-    throw createHttpError(
-      400,
-      'Field "season_end" must be greater than or equal to "season_start"',
-    );
-  }
-
-  if (title.episodeEnd !== null && title.episodeStart === null) {
-    throw createHttpError(400, 'Field "episode_end" requires "episode_start"');
-  }
-
-  if (
-    title.episodeStart !== null &&
-    title.episodeEnd !== null &&
-    title.episodeEnd < title.episodeStart
-  ) {
-    throw createHttpError(
-      400,
-      'Field "episode_end" must be greater than or equal to "episode_start"',
-    );
-  }
-
-  if (title.episodeStart !== null && title.seasonStart === null) {
-    throw createHttpError(400, 'Field "episode_start" requires "season_start"');
-  }
-
-  const normalizedSeasonEnd = title.seasonEnd ?? title.seasonStart;
-
-  if (
-    title.episodeStart !== null &&
-    title.seasonStart !== null &&
-    normalizedSeasonEnd !== null &&
-    normalizedSeasonEnd !== title.seasonStart
-  ) {
-    throw createHttpError(400, "Episode ranges require a single season");
-  }
-
-  return {
-    titleId: title.titleId,
-    seasonStart: title.seasonStart,
-    seasonEnd: normalizedSeasonEnd,
-    episodeStart: title.episodeStart,
-    episodeEnd: title.episodeEnd ?? title.episodeStart,
-  };
-}
-
-function parseInventoryTitleLinks(body: Record<string, unknown>) {
-  if (Array.isArray(body.title_links)) {
-    const links = body.title_links.flatMap((value) => {
-      if (!value || typeof value !== "object" || Array.isArray(value)) {
-        return [];
-      }
-
-      const titleId = optionalString(value.title_id);
-
-      if (!titleId) {
-        return [];
-      }
-
-      return [
-        validateSeasonRange({
-          titleId,
-          seasonStart: normalizeOptionalSeasonNumber(value.season_start, "season_start"),
-          seasonEnd: normalizeOptionalSeasonNumber(value.season_end, "season_end"),
-          episodeStart: normalizeOptionalSeasonNumber(value.episode_start, "episode_start"),
-          episodeEnd: normalizeOptionalSeasonNumber(value.episode_end, "episode_end"),
-        }),
-      ];
-    });
-
-    if (links.length > 0) {
-      return links;
-    }
-  }
-
-  const titleIds = Array.isArray(body.title_ids)
-    ? body.title_ids.filter(
-        (value): value is string => typeof value === "string" && value.trim() !== "",
-      )
-    : typeof body.title_ids === "string"
-      ? body.title_ids
-          .split(",")
-          .map((value) => value.trim())
-          .filter(Boolean)
-      : typeof body.movie_id === "string" && body.movie_id.trim()
-        ? [body.movie_id.trim()]
-        : [];
-
-  const seasonStarts = Array.isArray(body.season_starts) ? body.season_starts : [];
-  const seasonEnds = Array.isArray(body.season_ends) ? body.season_ends : [];
-  const episodeStarts = Array.isArray(body.episode_starts) ? body.episode_starts : [];
-  const episodeEnds = Array.isArray(body.episode_ends) ? body.episode_ends : [];
-
-  return titleIds.map((titleId, index) =>
-    validateSeasonRange({
-      titleId,
-      seasonStart: normalizeOptionalSeasonNumber(seasonStarts[index], "season_start"),
-      seasonEnd: normalizeOptionalSeasonNumber(seasonEnds[index], "season_end"),
-      episodeStart: normalizeOptionalSeasonNumber(episodeStarts[index], "episode_start"),
-      episodeEnd: normalizeOptionalSeasonNumber(episodeEnds[index], "episode_end"),
-    }),
-  );
-}
-
 export async function checkDatabaseHealth() {
   await pool.query("SELECT 1");
 }
@@ -907,13 +726,14 @@ export async function getMovieFiltersFromDatabase(): Promise<{
   genres: string[];
   years: number[];
 }> {
-  const result = await pool.query<{ genres: string[] | null; release_date: string | Date | null }>(
+  const result = await pool.query<{ genres: string[] | null; release_year: number }>(
     `
-      SELECT DISTINCT t.genres, t.release_date
+      SELECT DISTINCT t.genres, t.release_year
       FROM titles t
       INNER JOIN inventory_item_titles itt ON itt.title_id = t.id
       INNER JOIN inventory_items i ON i.id = itt.inventory_item_id
       WHERE i.reviewed = TRUE
+        AND ${PUBLIC_FORMATS_SQL}
     `,
   );
 
@@ -921,7 +741,7 @@ export async function getMovieFiltersFromDatabase(): Promise<{
   const years = Array.from(
     new Set(
       result.rows
-        .map((row) => (row.release_date ? new Date(row.release_date).getFullYear() : null))
+        .map((row) => Number(row.release_year))
         .filter((year): year is number => typeof year === "number" && Number.isFinite(year)),
     ),
   ).sort((a, b) => b - a);
@@ -957,6 +777,7 @@ export async function getMovieFromDatabase(id: string) {
         t.sort_title,
         t.overview,
         t.release_date,
+        t.release_year,
         t.poster_path,
         t.genres,
         t.director,
@@ -1040,6 +861,7 @@ export async function listBrowseMoviesFromDatabase(filters: {
         : null,
     available: filters.available === "true",
     reviewedOnly: true,
+    publicOnly: true,
     limit: filters.limit,
     sort:
       filters.sort === "rating-desc" ||
@@ -1081,6 +903,7 @@ export async function listBrowseMoviesPageFromDatabase(filters: {
         : null,
     available: filters.available === "true",
     reviewedOnly: true,
+    publicOnly: true,
     limit: filters.limit,
     page: filters.page,
     pageSize: filters.pageSize,
@@ -1114,6 +937,7 @@ export async function getTopGenresFromDatabase(
         CROSS JOIN LATERAL UNNEST(t.genres) AS genre
         WHERE genre <> ''
           AND i.reviewed = TRUE
+          AND ${PUBLIC_FORMATS_SQL}
           ${options?.excludeHomepageHidden ? "AND t.hide_from_homepage = FALSE" : ""}
         GROUP BY genre
       ) ranked_genres
@@ -1162,7 +986,9 @@ export async function getMovieDetailFromDatabase(id: string) {
   return getMovieFromDatabase(id);
 }
 
-export async function getPublicMovieDetailFromDatabase(id: string) {
+export async function getPublicMovieDetailFromDatabase(
+  id: string,
+): Promise<PublicMovieWithInventory> {
   const result = await pool.query<TitleRow>(
     `
       SELECT
@@ -1175,6 +1001,7 @@ export async function getPublicMovieDetailFromDatabase(id: string) {
         t.sort_title,
         t.overview,
         t.release_date,
+        t.release_year,
         t.poster_path,
         t.genres,
         t.director,
@@ -1185,7 +1012,7 @@ export async function getPublicMovieDetailFromDatabase(id: string) {
         COUNT(DISTINCT i.id) FILTER (WHERE i.reviewed = TRUE AND i.availability = TRUE)::INT AS available_count
       FROM titles t
       LEFT JOIN inventory_item_titles itt ON itt.title_id = t.id
-      LEFT JOIN inventory_items i ON i.id = itt.inventory_item_id
+      LEFT JOIN inventory_items i ON i.id = itt.inventory_item_id AND ${PUBLIC_FORMATS_SQL}
       WHERE t.id = $1
       GROUP BY t.id
       HAVING COUNT(DISTINCT i.id) FILTER (WHERE i.reviewed = TRUE) > 0;
@@ -1199,11 +1026,20 @@ export async function getPublicMovieDetailFromDatabase(id: string) {
     throw createHttpError(404, "Title not found");
   }
 
-  const inventoryItems = await getInventoryItemsForTitle(id, { reviewedOnly: true });
-  const collectionData = await getCollectionDataForTitle(id, { reviewedOnly: true });
+  const inventoryItems = await getInventoryItemsForTitle(id, {
+    reviewedOnly: true,
+    publicOnly: true,
+  });
+  const collectionData = await getCollectionDataForTitle(id, {
+    reviewedOnly: true,
+    publicOnly: true,
+  });
+
+  const publicInventoryItems = inventoryItems.filter(isPublicInventoryItem);
 
   return {
-    ...toUiTitle(title, inventoryItems),
+    ...toUiTitle(title, publicInventoryItems),
+    inventoryItems: publicInventoryItems,
     collection: collectionData.collection,
     collectionTitles: collectionData.collectionTitles,
   };
@@ -1234,7 +1070,7 @@ export async function findDuplicateMovieForDraft(input: {
   tmdbId: string;
   mediaType: string;
   title: string;
-  releaseDate: string;
+  releaseYear?: number;
 }) {
   const tmdbMatch = await findMovieByTmdbId(input.tmdbId, input.mediaType);
 
@@ -1245,6 +1081,7 @@ export async function findDuplicateMovieForDraft(input: {
   if (!input.title.trim()) {
     return null;
   }
+  if (!input.releaseYear) return null;
 
   const result = await pool.query<{ id: string }>(
     `
@@ -1252,10 +1089,10 @@ export async function findDuplicateMovieForDraft(input: {
       FROM titles
       WHERE LOWER(title) = LOWER($1)
         AND media_type = $2::title_media_type
-        AND ($3::date IS NULL OR release_date = $3::date)
+        AND release_year = $3
       LIMIT 1
     `,
-    [input.title.trim(), input.mediaType, input.releaseDate || null],
+    [input.title.trim(), input.mediaType, input.releaseYear],
   );
 
   return result.rows[0]?.id ?? null;
@@ -1274,6 +1111,7 @@ export async function getFeaturedMoviesFromDatabase() {
         t.sort_title,
         t.overview,
         t.release_date,
+        t.release_year,
         t.poster_path,
         t.genres,
         t.director,
@@ -1284,7 +1122,7 @@ export async function getFeaturedMoviesFromDatabase() {
         COUNT(DISTINCT i.id) FILTER (WHERE i.reviewed = TRUE AND i.availability = TRUE)::INT AS available_count
       FROM titles t
       LEFT JOIN inventory_item_titles itt ON itt.title_id = t.id
-      LEFT JOIN inventory_items i ON i.id = itt.inventory_item_id
+      LEFT JOIN inventory_items i ON i.id = itt.inventory_item_id AND ${PUBLIC_FORMATS_SQL}
       WHERE t.featured = TRUE
         AND t.hide_from_homepage = FALSE
       GROUP BY t.id
@@ -1309,6 +1147,7 @@ export async function getRecentlyReturnedMoviesFromDatabase(limit = 6) {
         t.sort_title,
         t.overview,
         t.release_date,
+        t.release_year,
         t.poster_path,
         t.genres,
         t.director,
@@ -1321,6 +1160,7 @@ export async function getRecentlyReturnedMoviesFromDatabase(limit = 6) {
       INNER JOIN inventory_item_titles itt ON itt.title_id = t.id
       INNER JOIN inventory_items i ON i.id = itt.inventory_item_id
       WHERE i.last_rented_at IS NOT NULL
+        AND ${PUBLIC_FORMATS_SQL}
         AND i.reviewed = TRUE
         AND t.hide_from_homepage = FALSE
       GROUP BY t.id
@@ -1340,30 +1180,41 @@ export async function createMovieInDatabase(input: {
   mediaType: string;
   title: string;
   sortTitle: string;
+  releaseYear: unknown;
   overview: string;
-  releaseDate: string;
+  releaseDate?: string;
   posterPath: string | null;
   genres: string[];
   director: string;
   cast: Array<{ name: string; character: string }>;
   collection?: TmdbCollectionDraft | null;
 }) {
+  const normalizedTitle = input.title.trim();
+  const normalizedSortTitle = input.sortTitle.trim();
+  let releaseYear: number | null;
+  try {
+    releaseYear = normalizeReleaseYearInput(input.releaseYear);
+  } catch (error) {
+    if (error instanceof ReleaseYearInputError) throw createHttpError(400, error.message);
+    throw error;
+  }
+  if (!normalizedTitle) throw createHttpError(400, 'Field "title" is required');
+  if (!normalizedSortTitle) throw createHttpError(400, 'Field "sort_title" is required');
+  if (releaseYear === null) throw createHttpError(400, 'Field "release_year" is required');
+  const releaseDate = input.releaseDate?.trim() ?? "";
+  if (releaseDate && Number(releaseDate.slice(0, 4)) !== releaseYear) {
+    throw createHttpError(400, "Release date must match the release year.");
+  }
+
   const duplicateId = await findDuplicateMovieForDraft({
     tmdbId: input.tmdbId,
     mediaType: input.mediaType,
-    title: input.title,
-    releaseDate: input.releaseDate,
+    title: normalizedTitle,
+    releaseYear,
   });
 
   if (duplicateId) {
     throw createHttpError(409, "Title already exists");
-  }
-
-  const normalizedTitle = input.title.trim();
-  const normalizedSortTitle = input.sortTitle.trim() || getSuggestedSortTitle(normalizedTitle);
-
-  if (!normalizedTitle) {
-    throw createHttpError(400, 'Field "title" is required');
   }
 
   const normalizedImdbId =
@@ -1388,8 +1239,9 @@ export async function createMovieInDatabase(input: {
       mediaType: normalizeMediaType(input.mediaType),
       title: normalizedTitle,
       sortTitle: normalizedSortTitle,
+      releaseYear,
       overview: input.overview.trim(),
-      releaseDate: input.releaseDate || "",
+      releaseDate,
       posterPath: input.posterPath,
       genres: input.genres,
       director: input.director.trim() || "",
@@ -1414,8 +1266,8 @@ export async function createMovieInDatabase(input: {
       const duplicateId = await findDuplicateMovieForDraft({
         tmdbId: input.tmdbId,
         mediaType: input.mediaType,
-        title: input.title,
-        releaseDate: input.releaseDate,
+        title: normalizedTitle,
+        releaseYear,
       });
 
       if (duplicateId) {
@@ -1440,6 +1292,7 @@ async function upsertTitleFromDraft(
     mediaType: "movie" | "series";
     title: string;
     sortTitle: string;
+    releaseYear: number;
     overview: string;
     releaseDate: string;
     posterPath: string | null;
@@ -1458,6 +1311,7 @@ async function upsertTitleFromDraft(
         title,
         sort_title,
         overview,
+        release_year,
         release_date,
         poster_path,
         genres,
@@ -1465,7 +1319,7 @@ async function upsertTitleFromDraft(
         cast_members,
         featured
       )
-      VALUES ($1, $2, $3, $4::title_media_type, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13)
+      VALUES ($1, $2, $3, $4::title_media_type, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14)
       ON CONFLICT (tmdb_id, media_type)
       DO UPDATE SET
         imdb_id = COALESCE(EXCLUDED.imdb_id, titles.imdb_id),
@@ -1480,7 +1334,11 @@ async function upsertTitleFromDraft(
           WHEN EXCLUDED.overview <> '' THEN EXCLUDED.overview
           ELSE titles.overview
         END,
-        release_date = COALESCE(EXCLUDED.release_date, titles.release_date),
+        release_year = EXCLUDED.release_year,
+        release_date = CASE
+          WHEN EXCLUDED.release_year <> titles.release_year THEN EXCLUDED.release_date
+          ELSE COALESCE(EXCLUDED.release_date, titles.release_date)
+        END,
         poster_path = COALESCE(EXCLUDED.poster_path, titles.poster_path),
         genres = CASE
           WHEN CARDINALITY(EXCLUDED.genres) > 0 THEN EXCLUDED.genres
@@ -1505,6 +1363,7 @@ async function upsertTitleFromDraft(
       input.title.trim(),
       input.sortTitle.trim(),
       input.overview.trim(),
+      input.releaseYear,
       input.releaseDate || null,
       input.posterPath,
       input.genres,
@@ -1615,664 +1474,25 @@ async function upsertCollectionForTitle(
   }
 }
 
-export async function getAlphabeticalStockSectionsFromDatabase(input: {
-  zone?: string;
-  zones?: string[];
-  formats?: string[];
-  view?: string;
-}): Promise<StockViewSection[]> {
-  const zones =
-    input.zones && input.zones.length > 0
-      ? input.zones.map((zone) => normalizeZone(zone))
-      : input.zone
-        ? [normalizeZone(input.zone)]
-        : ["W"];
-  const view = input.view === "edited-today" ? "edited-today" : "alphabetical";
-  const formats =
-    input.formats && input.formats.length > 0
-      ? input.formats.map((format) => normalizeFormat(format))
-      : ["blu-ray"];
-
-  const result = await pool.query<StockDiscRow>(
-    `
-      SELECT
-        i.id,
-        i.inventory_code,
-        i.format::text,
-        i.sealed,
-        i.availability,
-        i.zone::text,
-        (SELECT z.label FROM inventory_zones z WHERE z.code = i.zone) AS zone_label,
-        i.section,
-        i.row,
-        i.notes,
-        i.location_code,
-        i.last_rented_at,
-        i.day_price,
-        i.weekend_price,
-        i.late_class,
-        i.updated_at,
-        COALESCE(
-          JSONB_AGG(
-            JSONB_BUILD_OBJECT(
-              'id', t.id,
-              'title', t.title,
-              'sort_title', t.sort_title,
-              'media_type', t.media_type::text,
-              'release_date', t.release_date,
-              'season_start', itt.season_start,
-              'season_end', itt.season_end,
-              'episode_start', itt.episode_start,
-              'episode_end', itt.episode_end
-            )
-            ORDER BY itt.position ASC, t.sort_title ASC
-          ) FILTER (WHERE t.id IS NOT NULL),
-          '[]'::jsonb
-        ) AS linked_titles,
-        COALESCE(collection_info.anchor_title, primary_title.title, '') AS sort_label,
-        COALESCE(collection_info.anchor_sort_title, primary_title.sort_title, primary_title.title, '') AS sort_anchor,
-        COALESCE(collection_info.first_position, 0) AS sort_sequence,
-        collection_info.collection_name
-      FROM inventory_items i
-      INNER JOIN inventory_item_titles itt ON itt.inventory_item_id = i.id
-      INNER JOIN titles t ON t.id = itt.title_id
-      LEFT JOIN LATERAL (
-        SELECT
-          t0.title,
-          t0.sort_title
-        FROM inventory_item_titles itt0
-        INNER JOIN titles t0 ON t0.id = itt0.title_id
-        WHERE itt0.inventory_item_id = i.id
-        ORDER BY itt0.position ASC, t0.sort_title ASC, t0.title ASC
-        LIMIT 1
-      ) AS primary_title ON TRUE
-      LEFT JOIN LATERAL (
-        SELECT
-          c.name AS collection_name,
-          c.anchor_title,
-          c.anchor_sort_title,
-          MIN(ct.position)::int AS first_position
-        FROM inventory_item_titles itt0
-        INNER JOIN collection_titles ct ON ct.title_id = itt0.title_id
-        INNER JOIN collections c ON c.id = ct.collection_id
-        WHERE itt0.inventory_item_id = i.id
-        GROUP BY c.id, c.name, c.anchor_title, c.anchor_sort_title
-        ORDER BY MIN(ct.position) ASC, c.anchor_sort_title ASC, c.name ASC
-        LIMIT 1
-      ) AS collection_info ON TRUE
-      WHERE i.zone = ANY($1::text[])
-        AND i.format = ANY($2::inventory_format[])
-        AND ($3::text <> 'edited-today' OR i.updated_at >= CURRENT_DATE)
-      GROUP BY i.id, primary_title.title, primary_title.sort_title, collection_info.collection_name, collection_info.anchor_title, collection_info.anchor_sort_title, collection_info.first_position
-      ORDER BY
-        CASE WHEN $3::text = 'edited-today' THEN i.updated_at END DESC NULLS LAST,
-        CASE WHEN $3::text <> 'edited-today' THEN i.section END ASC,
-        CASE WHEN $3::text <> 'edited-today' THEN COALESCE(collection_info.anchor_sort_title, primary_title.sort_title, primary_title.title, '') END ASC,
-        CASE WHEN $3::text <> 'edited-today' THEN COALESCE(collection_info.first_position, 0) END ASC,
-        CASE WHEN $3::text <> 'edited-today' THEN primary_title.sort_title END ASC,
-        i.created_at ASC;
-    `,
-    [zones, formats, view],
-  );
-
-  const grouped = new Map<string, StockViewDisc[]>();
-
-  for (const row of result.rows) {
-    const section = row.section.trim() || "Unsorted";
-    const groupKey = `${row.zone}:${section}`;
-    const items = grouped.get(groupKey) ?? [];
-    items.push(toUiStockDisc(row));
-    grouped.set(groupKey, items);
-  }
-
-  return Array.from(grouped.entries())
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(([groupKey, items]) => {
-      const [zone, ...sectionParts] = groupKey.split(":");
-
-      return {
-        section: `${items[0]?.zoneLabel ?? formatZoneLabel(zone)} / ${sectionParts.join(":")}`,
-        items,
-      };
-    });
-}
-
-export async function listStockDiscsFromDatabase(input: {
-  preset?: string;
-  q?: string;
-  section?: string;
-  row?: string;
-  availability?: string;
-  edited?: string;
-  formats?: string[];
-  primary?: string;
-  zones?: string[];
-  sealedStates?: string[];
-  reviewedState?: string;
-  sort?: string;
-  dir?: string;
-  page?: number;
-  pageSize?: number;
-}): Promise<StockViewPage> {
-  const conditions = [];
-  const values: Array<string> = [];
-  let searchRankSql = "0";
-  const preset = input.preset ?? "all";
-  const normalizedSort = input.sort ?? "updated";
-  const sortDirection = input.dir === "asc" ? "ASC" : "DESC";
-  const currentFormatPrioritySql = getFormatPrioritySql("i.format");
-  const candidateFormatPrioritySql = getFormatPrioritySql("i_primary.format");
-  const pageSize =
-    typeof input.pageSize === "number" && Number.isInteger(input.pageSize) && input.pageSize > 0
-      ? input.pageSize
-      : 50;
-  const page =
-    typeof input.page === "number" && Number.isInteger(input.page) && input.page > 0
-      ? input.page
-      : 1;
-
-  if (input.q?.trim()) {
-    const normalizedSearch = input.q.trim().toLowerCase();
-    const prefixTsQuery = buildPrefixTsQuery(normalizedSearch);
-    const allowNotesMatch = normalizedSearch.length >= 3;
-
-    values.push(normalizedSearch);
-    const exactIndex = values.length;
-    values.push(`${normalizedSearch}%`);
-    const prefixIndex = values.length;
-    values.push(`%${normalizedSearch}%`);
-    const containsIndex = values.length;
-    const titleTsIndex = prefixTsQuery ? (values.push(prefixTsQuery), values.length) : null;
-
-    conditions.push(`
-      (
-        LOWER(i.inventory_code) = $${exactIndex}
-        OR LOWER(i.inventory_code) LIKE $${prefixIndex}
-        OR LOWER(i.id::text) LIKE $${containsIndex}
-        OR LOWER(i.location_code) LIKE $${prefixIndex}
-        ${allowNotesMatch ? `OR LOWER(i.notes) LIKE $${containsIndex}` : ""}
-        OR EXISTS (
-          SELECT 1
-          FROM inventory_item_titles ittq
-          INNER JOIN titles tq ON tq.id = ittq.title_id
-          WHERE ittq.inventory_item_id = i.id
-            AND (
-              LOWER(tq.title) = $${exactIndex}
-              OR LOWER(tq.sort_title) = $${exactIndex}
-              OR LOWER(tq.title) LIKE $${prefixIndex}
-              OR LOWER(tq.sort_title) LIKE $${prefixIndex}
-              OR LOWER(tq.title) LIKE $${containsIndex}
-              OR LOWER(tq.sort_title) LIKE $${containsIndex}
-              ${titleTsIndex ? `OR ${STOCK_TITLE_SEARCH_VECTOR_SQL} @@ to_tsquery('simple', $${titleTsIndex})` : ""}
-            )
-        )
-      )
-    `);
-
-    searchRankSql = `
-      (
-        CASE WHEN LOWER(i.inventory_code) = $${exactIndex} THEN 500 ELSE 0 END
-        + CASE WHEN LOWER(i.inventory_code) LIKE $${prefixIndex} THEN 260 ELSE 0 END
-        + CASE
-          WHEN EXISTS (
-            SELECT 1
-            FROM inventory_item_titles ittq
-            INNER JOIN titles tq ON tq.id = ittq.title_id
-            WHERE ittq.inventory_item_id = i.id
-              AND (LOWER(tq.title) = $${exactIndex} OR LOWER(tq.sort_title) = $${exactIndex})
-          ) THEN 240
-          ELSE 0
-        END
-        + CASE
-          WHEN EXISTS (
-            SELECT 1
-            FROM inventory_item_titles ittq
-            INNER JOIN titles tq ON tq.id = ittq.title_id
-            WHERE ittq.inventory_item_id = i.id
-              AND (
-                LOWER(tq.title) LIKE $${prefixIndex}
-                OR LOWER(tq.sort_title) LIKE $${prefixIndex}
-              )
-          ) THEN 180
-          ELSE 0
-        END
-        + CASE
-          WHEN EXISTS (
-            SELECT 1
-            FROM inventory_item_titles ittq
-            INNER JOIN titles tq ON tq.id = ittq.title_id
-            WHERE ittq.inventory_item_id = i.id
-              AND ${
-                titleTsIndex
-                  ? `${STOCK_TITLE_SEARCH_VECTOR_SQL} @@ to_tsquery('simple', $${titleTsIndex})`
-                  : "FALSE"
-              }
-          ) THEN 120
-          ELSE 0
-        END
-        + CASE WHEN LOWER(i.location_code) LIKE $${prefixIndex} THEN 80 ELSE 0 END
-        + CASE WHEN LOWER(i.id::text) LIKE $${containsIndex} THEN 40 ELSE 0 END
-        + CASE WHEN ${allowNotesMatch ? `LOWER(i.notes) LIKE $${containsIndex}` : "FALSE"} THEN 10 ELSE 0 END
-      )
-    `;
-  }
-
-  if (input.availability?.trim() && input.availability !== "all") {
-    values.push(input.availability === "available" ? "true" : "false");
-    conditions.push(`i.availability = $${values.length}::boolean`);
-  }
-
-  if (input.section?.trim()) {
-    values.push(input.section.trim().toUpperCase());
-    conditions.push(`UPPER(i.section) = $${values.length}`);
-  }
-
-  if (input.row?.trim()) {
-    values.push(input.row.trim().toUpperCase());
-    conditions.push(`UPPER(i.row) = $${values.length}`);
-  }
-
-  if (input.edited === "day") {
-    conditions.push(`i.updated_at >= NOW() - INTERVAL '1 day'`);
-  } else if (input.edited === "week") {
-    conditions.push(`i.updated_at >= NOW() - INTERVAL '7 days'`);
-  } else if (input.edited === "month") {
-    conditions.push(`i.updated_at >= NOW() - INTERVAL '1 month'`);
-  }
-
-  const normalizedFormats = Array.isArray(input.formats)
-    ? input.formats
-        .filter((value) => typeof value === "string" && value.trim() !== "" && value !== "all")
-        .map((value) => normalizeFormat(value))
-    : [];
-
-  if (normalizedFormats.length > 0) {
-    values.push(normalizedFormats.join(","));
-    conditions.push(`i.format = ANY(string_to_array($${values.length}, ',')::inventory_format[])`);
-  }
-
-  const normalizedZones = Array.isArray(input.zones)
-    ? input.zones
-        .filter((value) => typeof value === "string" && value.trim() !== "" && value !== "all")
-        .map((value) => normalizeZone(value))
-    : [];
-
-  if (normalizedZones.length > 0) {
-    values.push(normalizedZones.join(","));
-    conditions.push(`i.zone = ANY(string_to_array($${values.length}, ','))`);
-  }
-
-  const normalizedSealedStates = Array.isArray(input.sealedStates)
-    ? Array.from(
-        new Set(
-          input.sealedStates
-            .filter((value) => typeof value === "string" && value.trim() !== "" && value !== "all")
-            .map((value) => String(normalizeSealed(value, "sealed"))),
-        ),
-      )
-    : [];
-
-  if (normalizedSealedStates.length === 1) {
-    values.push(normalizedSealedStates[0]);
-    conditions.push(`i.sealed = $${values.length}::boolean`);
-  }
-
-  if (input.reviewedState === "true") {
-    conditions.push(`i.reviewed = TRUE`);
-  } else if (input.reviewedState === "false") {
-    conditions.push(`i.reviewed = FALSE`);
-  }
-
-  if (preset === "available") {
-    conditions.push(`i.availability = TRUE`);
-  } else if (preset === "edited-today") {
-    conditions.push(`i.updated_at >= NOW() - INTERVAL '1 day'`);
-  } else if (preset === "unavailable") {
-    conditions.push(`i.availability = FALSE`);
-  } else if (preset === "needs-review") {
-    conditions.push(`i.reviewed = FALSE`);
-  } else if (preset === "sealed") {
-    conditions.push(`i.sealed = TRUE`);
-  }
-
-  const primaryPredicateSql = `
-    EXISTS (
-      SELECT 1
-      FROM inventory_item_titles itt0
-      WHERE itt0.inventory_item_id = i.id
-        AND NOT EXISTS (
-          SELECT 1
-          FROM inventory_item_titles itt_primary
-          INNER JOIN inventory_items i_primary ON i_primary.id = itt_primary.inventory_item_id
-          WHERE itt_primary.title_id = itt0.title_id
-            AND (
-              ${candidateFormatPrioritySql} < ${currentFormatPrioritySql}
-              OR (
-                ${candidateFormatPrioritySql} = ${currentFormatPrioritySql}
-                AND COALESCE(i_primary.inventory_code, i_primary.id::text) < COALESCE(i.inventory_code, i.id::text)
-              )
-            )
-        )
-    )
-  `;
-
-  if (input.primary === "primary") {
-    conditions.push(primaryPredicateSql);
-  } else if (input.primary === "duplicate") {
-    conditions.push(`NOT (${primaryPredicateSql})`);
-  }
-
-  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-
-  const sortTitleFallbackSql =
-    `COALESCE(collection_info.anchor_sort_title, primary_title.sort_title, primary_title.title, '') ASC, ` +
-    `COALESCE(collection_info.first_position, 0) ASC, ` +
-    `primary_title.sort_title ASC, primary_title.title ASC, COALESCE(i.inventory_code, i.id::text) ASC`;
-
-  const sortSql = (() => {
-    switch (normalizedSort) {
-      case "disc":
-        return `COALESCE(i.inventory_code, i.id::text) ${sortDirection}, ${sortTitleFallbackSql}`;
-      case "format":
-        return `i.format ${sortDirection}, ${sortTitleFallbackSql}`;
-      case "primary":
-        return `COALESCE(primary_info.is_primary, FALSE) ${sortDirection}, COALESCE(i.inventory_code, i.id::text) DESC, ${sortTitleFallbackSql}`;
-      case "availability":
-        return `i.availability ${sortDirection}, ${sortTitleFallbackSql}`;
-      case "titles":
-        return `${sortTitleFallbackSql}`;
-      case "order":
-        return `COALESCE(collection_info.anchor_sort_title, primary_title.sort_title, primary_title.title, '') ${sortDirection}, COALESCE(collection_info.first_position, 0) ASC, primary_title.sort_title ASC, primary_title.title ASC, COALESCE(i.inventory_code, i.id::text) ASC`;
-      case "location":
-        return `i.zone ${sortDirection}, i.section ${sortDirection}, i.row ${sortDirection} NULLS LAST, ${sortTitleFallbackSql}`;
-      case "reviewed":
-        return `i.reviewed ${sortDirection}, ${sortTitleFallbackSql}`;
-      case "sealed":
-        return `i.sealed ${sortDirection}, ${sortTitleFallbackSql}`;
-      case "updated":
-      default:
-        return `i.updated_at ${sortDirection}, ${sortTitleFallbackSql}`;
-    }
-  })();
-
-  const countResult = await pool.query<{ count: string }>(
-    `
-      SELECT COUNT(DISTINCT i.id)::text AS count
-      FROM inventory_items i
-      INNER JOIN inventory_item_titles itt ON itt.inventory_item_id = i.id
-      INNER JOIN titles t ON t.id = itt.title_id
-      ${whereClause};
-    `,
-    values,
-  );
-
-  const totalCount = Number.parseInt(countResult.rows[0]?.count ?? "0", 10);
-  const safePage = totalCount === 0 ? 1 : Math.min(page, Math.ceil(totalCount / pageSize));
-  const offset = (safePage - 1) * pageSize;
-  const pagedValues = [...values, pageSize.toString(), offset.toString()];
-
-  const result = await pool.query<StockDiscRow>(
-    `
-      SELECT
-        i.id,
-        i.inventory_code,
-        i.format::text,
-        i.sealed,
-        i.availability,
-        i.reviewed,
-        COALESCE(primary_info.is_primary, FALSE) AS is_primary,
-        ${searchRankSql}::numeric AS search_rank,
-        i.zone::text,
-        (SELECT z.label FROM inventory_zones z WHERE z.code = i.zone) AS zone_label,
-        i.section,
-        i.row,
-        i.notes,
-        i.location_code,
-        i.last_rented_at,
-        i.day_price,
-        i.weekend_price,
-        i.late_class,
-        i.updated_at,
-        COALESCE(
-          JSONB_AGG(
-            JSONB_BUILD_OBJECT(
-              'id', t.id,
-              'title', t.title,
-              'media_type', t.media_type::text,
-              'release_date', t.release_date,
-              'season_start', itt.season_start,
-              'season_end', itt.season_end,
-              'episode_start', itt.episode_start,
-              'episode_end', itt.episode_end
-            )
-            ORDER BY itt.position ASC, t.sort_title ASC
-          ) FILTER (WHERE t.id IS NOT NULL),
-          '[]'::jsonb
-        ) AS linked_titles,
-        COALESCE(collection_info.anchor_title, primary_title.title, '') AS sort_label,
-        COALESCE(collection_info.anchor_sort_title, primary_title.sort_title, primary_title.title, '') AS sort_anchor,
-        COALESCE(collection_info.first_position, 0) AS sort_sequence,
-        collection_info.collection_name
-      FROM inventory_items i
-      INNER JOIN inventory_item_titles itt ON itt.inventory_item_id = i.id
-      INNER JOIN titles t ON t.id = itt.title_id
-      LEFT JOIN LATERAL (
-        SELECT
-          t0.title,
-          t0.sort_title
-        FROM inventory_item_titles itt0
-        INNER JOIN titles t0 ON t0.id = itt0.title_id
-        WHERE itt0.inventory_item_id = i.id
-        ORDER BY itt0.position ASC, t0.sort_title ASC, t0.title ASC
-        LIMIT 1
-      ) AS primary_title ON TRUE
-      LEFT JOIN LATERAL (
-        SELECT
-          c.name AS collection_name,
-          c.anchor_title,
-          c.anchor_sort_title,
-          MIN(ct.position)::int AS first_position
-        FROM inventory_item_titles itt0
-        INNER JOIN collection_titles ct ON ct.title_id = itt0.title_id
-        INNER JOIN collections c ON c.id = ct.collection_id
-        WHERE itt0.inventory_item_id = i.id
-        GROUP BY c.id, c.name, c.anchor_title, c.anchor_sort_title
-        ORDER BY MIN(ct.position) ASC, c.anchor_sort_title ASC, c.name ASC
-        LIMIT 1
-      ) AS collection_info ON TRUE
-      LEFT JOIN LATERAL (
-        SELECT BOOL_OR(
-          NOT EXISTS (
-            SELECT 1
-            FROM inventory_item_titles itt_primary
-            INNER JOIN inventory_items i_primary ON i_primary.id = itt_primary.inventory_item_id
-            WHERE itt_primary.title_id = itt0.title_id
-              AND (
-                ${candidateFormatPrioritySql} < ${currentFormatPrioritySql}
-                OR (
-                  ${candidateFormatPrioritySql} = ${currentFormatPrioritySql}
-                  AND COALESCE(i_primary.inventory_code, i_primary.id::text) < COALESCE(i.inventory_code, i.id::text)
-                )
-              )
-          )
-        ) AS is_primary
-        FROM inventory_item_titles itt0
-        WHERE itt0.inventory_item_id = i.id
-      ) AS primary_info ON TRUE
-      ${whereClause}
-      GROUP BY i.id, primary_info.is_primary, primary_title.title, primary_title.sort_title, collection_info.collection_name, collection_info.anchor_title, collection_info.anchor_sort_title, collection_info.first_position
-      ORDER BY ${input.q?.trim() ? "search_rank DESC, " : ""}${sortSql}
-      LIMIT $${values.length + 1}::int
-      OFFSET $${values.length + 2}::int;
-    `,
-    pagedValues,
-  );
-
-  return {
-    items: result.rows.map(toUiStockDisc),
-    totalCount,
-  };
-}
-
-export async function getStockViewOptionsFromDatabase() {
-  const sectionResult = await pool.query<{ section: string }>(
-    `
-      SELECT DISTINCT section
-      FROM inventory_items
-      WHERE section <> ''
-      ORDER BY section ASC;
-    `,
-  );
-
-  return {
-    sections: sectionResult.rows.map((row) => row.section),
-  };
-}
-
-export async function createInventoryItemInDatabase(body: Record<string, unknown>) {
-  const titleLinks = parseInventoryTitleLinks(body);
-  const titleIds = titleLinks.map((link) => link.titleId);
-
-  const format = normalizeFormat(body.format);
-  const sealed =
-    body.sealed !== undefined
-      ? normalizeSealed(body.sealed)
-      : body.condition !== undefined
-        ? normalizeSealed(body.condition, "condition")
-        : false;
-  const zone = normalizeZone(body.zone);
-  await assertInventoryZoneIsAssignable(zone);
-  const section = normalizeLocationPart(body.section, "section");
-  const row = normalizeRowPart(body.row);
-  const locationCode = buildLocationCode(zone, section, row);
-  const notes = optionalString(body.notes) ?? "";
-  const lastRentedAt = optionalString(body.last_rented_at);
-  const availability =
-    body.availability === undefined ? true : normalizeAvailability(body.availability);
-  const reviewed = body.reviewed === undefined ? false : normalizeAvailability(body.reviewed);
-  const dayPrice = body.day_price === undefined ? 0 : normalizeMoney(body.day_price, "day_price");
-  const weekendPrice =
-    body.weekend_price === undefined ? 0 : normalizeMoney(body.weekend_price, "weekend_price");
-  const lateClass = body.late_class === undefined ? 0 : normalizeLateClass(body.late_class);
-
-  await ensureTitlesExist(titleIds);
-
-  const client = await pool.connect();
-
-  try {
-    await client.query("BEGIN");
-    const inventoryCode = await allocateLowestInventoryCode(client);
-
-    const inventoryResult = await client.query<{ id: string; inventory_code: string }>(
-      `
-        INSERT INTO inventory_items (
-          inventory_code,
-          availability,
-          reviewed,
-          sealed,
-          format,
-          zone,
-          section,
-          row,
-          location_code,
-          notes,
-          last_rented_at,
-          day_price,
-          weekend_price,
-          late_class
-        )
-        VALUES ($1, $2, $3, $4, $5::inventory_format, $6, $7, $8, $9, $10, $11::timestamptz, $12::numeric(10,2), $13::numeric(10,2), $14::integer)
-        RETURNING id, inventory_code;
-      `,
-      [
-        inventoryCode,
-        availability,
-        reviewed,
-        sealed,
-        format,
-        zone,
-        section,
-        row,
-        locationCode,
-        notes,
-        lastRentedAt,
-        dayPrice,
-        weekendPrice,
-        lateClass,
-      ],
-    );
-
-    const inventoryItemId = inventoryResult.rows[0].id;
-    const createdInventoryCode = inventoryResult.rows[0].inventory_code;
-
-    for (const [index, titleLink] of titleLinks.entries()) {
-      await client.query(
-        `
-          INSERT INTO inventory_item_titles (
-            inventory_item_id,
-            title_id,
-            season_start,
-            season_end,
-            episode_start,
-            episode_end,
-            position
-          )
-          VALUES ($1, $2, $3, $4, $5, $6, $7)
-        `,
-        [
-          inventoryItemId,
-          titleLink.titleId,
-          titleLink.seasonStart,
-          titleLink.seasonEnd,
-          titleLink.episodeStart,
-          titleLink.episodeEnd,
-          index + 1,
-        ],
-      );
-    }
-
-    await client.query("COMMIT");
-    return { id: inventoryItemId, inventoryCode: createdInventoryCode };
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
-}
-
-export async function generateInventoryCodeForDisc(id: string) {
-  const result = await pool.query<{ id: string; inventory_code: string }>(
-    `
-      UPDATE inventory_items
-      SET updated_at = NOW()
-      WHERE id = $1
-      RETURNING id, inventory_code;
-    `,
-    [id],
-  );
-
-  if (result.rowCount === 0) {
-    throw createHttpError(404, "Inventory item not found");
-  }
-
-  return {
-    id: result.rows[0].id,
-    inventoryCode: result.rows[0].inventory_code,
-  };
-}
-
-export async function clearInventoryCodeForDisc(_discId?: string) {
-  void _discId;
-  throw createHttpError(400, "Disc codes are permanent");
-}
-
 export async function updateMovieInDatabase(id: string, body: Record<string, unknown>) {
   const title = body.title === undefined ? null : requireNonEmptyString(body.title, "title");
   const sortTitle =
     body.sort_title === undefined ? null : requireNonEmptyString(body.sort_title, "sort_title");
   const overview = body.overview === undefined ? null : (optionalString(body.overview) ?? "");
   const releaseDate = body.release_date === undefined ? null : optionalString(body.release_date);
+  let releaseYear: number | null = null;
+  if (body.release_year !== undefined) {
+    try {
+      releaseYear = normalizeReleaseYearInput(body.release_year);
+    } catch (error) {
+      if (error instanceof ReleaseYearInputError) throw createHttpError(400, error.message);
+      throw error;
+    }
+    if (releaseYear === null) throw createHttpError(400, 'Field "release_year" is required');
+  }
+  if (releaseDate && releaseYear !== null && Number(releaseDate.slice(0, 4)) !== releaseYear) {
+    throw createHttpError(400, "Release date must match the release year.");
+  }
   const mediaType = body.media_type === undefined ? null : normalizeMediaType(body.media_type);
   const featured =
     body.featured === undefined
@@ -2341,6 +1561,7 @@ export async function updateMovieInDatabase(id: string, body: Record<string, unk
     sortTitle === null &&
     overview === null &&
     releaseDate === null &&
+    releaseYear === null &&
     mediaType === null &&
     featured === null &&
     hideFromHomepage === null &&
@@ -2359,7 +1580,11 @@ export async function updateMovieInDatabase(id: string, body: Record<string, unk
         title = COALESCE($2, title),
         sort_title = COALESCE($3, sort_title),
         overview = COALESCE($4, overview),
-        release_date = COALESCE($5::date, release_date),
+        release_year = COALESCE($13, release_year),
+        release_date = CASE
+          WHEN $13 IS NOT NULL AND $13 <> release_year THEN NULL
+          ELSE COALESCE($5::date, release_date)
+        END,
         media_type = COALESCE($6::title_media_type, media_type),
         featured = COALESCE($7, featured),
         hide_from_homepage = COALESCE($8, hide_from_homepage),
@@ -2384,6 +1609,7 @@ export async function updateMovieInDatabase(id: string, body: Record<string, unk
       posterPath,
       genres,
       castMembers ? JSON.stringify(castMembers.map((name) => ({ name, character: "" }))) : null,
+      releaseYear,
     ],
   );
 
@@ -2494,122 +1720,6 @@ function requireNonEmptyString(value: unknown, fieldName: string) {
   }
 
   return normalizedValue;
-}
-
-export async function updateInventoryItemInDatabase(id: string, body: Record<string, unknown>) {
-  const titleLinks = body.title_links === undefined ? null : parseInventoryTitleLinks(body);
-  const updateValues = {
-    format: body.format === undefined ? null : normalizeFormat(body.format),
-    availability: body.availability === undefined ? null : normalizeAvailability(body.availability),
-    reviewed: body.reviewed === undefined ? null : normalizeAvailability(body.reviewed),
-    sealed:
-      body.sealed !== undefined
-        ? normalizeSealed(body.sealed)
-        : body.condition !== undefined
-          ? normalizeSealed(body.condition, "condition")
-          : null,
-    zone: body.zone === undefined ? null : normalizeZone(body.zone),
-    section: body.section === undefined ? null : normalizeLocationPart(body.section, "section"),
-    row: body.row === undefined ? null : normalizeRowPart(body.row),
-    notes: body.notes === undefined ? null : (optionalString(body.notes) ?? ""),
-    lastRentedAt: body.last_rented_at === undefined ? null : optionalString(body.last_rented_at),
-    dayPrice: body.day_price === undefined ? null : normalizeMoney(body.day_price, "day_price"),
-    weekendPrice:
-      body.weekend_price === undefined ? null : normalizeMoney(body.weekend_price, "weekend_price"),
-    lateClass: body.late_class === undefined ? null : normalizeLateClass(body.late_class),
-  };
-
-  if (updateValues.zone !== null) {
-    await assertInventoryZoneIsAssignable(updateValues.zone, id);
-  }
-
-  if (Object.values(updateValues).every((value) => value === null) && titleLinks === null) {
-    throw createHttpError(400, "Request body must include at least one updatable field");
-  }
-  const client = await pool.connect();
-
-  try {
-    await client.query("BEGIN");
-
-    const result = await client.query(
-      `
-        UPDATE inventory_items
-        SET
-          format = COALESCE($2::inventory_format, format),
-          availability = COALESCE($3, availability),
-          reviewed = COALESCE($4, reviewed),
-          sealed = COALESCE($5, sealed),
-          zone = COALESCE($6, zone),
-          section = COALESCE($7, section),
-          row = COALESCE($8, row),
-          location_code = CONCAT(COALESCE($6, zone), '/', COALESCE($7, section), COALESCE($8, row)),
-          notes = COALESCE($9, notes),
-          last_rented_at = COALESCE($10::timestamptz, last_rented_at),
-          day_price = COALESCE($11::numeric(10,2), day_price),
-          weekend_price = COALESCE($12::numeric(10,2), weekend_price),
-          late_class = COALESCE($13::integer, late_class),
-          updated_at = NOW()
-        WHERE id = $1
-        RETURNING id;
-      `,
-      [
-        id,
-        updateValues.format,
-        updateValues.availability,
-        updateValues.reviewed,
-        updateValues.sealed,
-        updateValues.zone,
-        updateValues.section,
-        updateValues.row,
-        updateValues.notes,
-        updateValues.lastRentedAt,
-        updateValues.dayPrice,
-        updateValues.weekendPrice,
-        updateValues.lateClass,
-      ],
-    );
-
-    if (result.rowCount === 0) {
-      throw createHttpError(404, "Inventory item not found");
-    }
-
-    if (titleLinks !== null) {
-      for (const titleLink of titleLinks) {
-        const updateLinkResult = await client.query(
-          `
-            UPDATE inventory_item_titles
-            SET season_start = $3,
-                season_end = $4,
-                episode_start = $5,
-                episode_end = $6
-            WHERE inventory_item_id = $1
-              AND title_id = $2
-            RETURNING inventory_item_id;
-          `,
-          [
-            id,
-            titleLink.titleId,
-            titleLink.seasonStart,
-            titleLink.seasonEnd,
-            titleLink.episodeStart,
-            titleLink.episodeEnd,
-          ],
-        );
-
-        if (updateLinkResult.rowCount === 0) {
-          throw createHttpError(404, "One or more linked titles were not found for the disc");
-        }
-      }
-    }
-
-    await client.query("COMMIT");
-    return { id };
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
 }
 
 export async function bulkUpdateMovieInventoryInDatabase(
@@ -2770,3 +1880,9 @@ export async function bulkUpdateInventoryItemsInDatabase(body: Record<string, un
 
   throw createHttpError(400, 'Field "action" is invalid');
 }
+
+export {
+  getAlphabeticalStockSectionsFromDatabase,
+  getStockViewOptionsFromDatabase,
+  listStockDiscsFromDatabase,
+} from "@/lib/server/inventory/stock-queries";

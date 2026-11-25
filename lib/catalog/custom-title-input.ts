@@ -1,10 +1,11 @@
 import type { MediaType } from "@/lib/types";
+import { normalizeReleaseYearInput, ReleaseYearInputError } from "@/lib/catalog/release-year-input";
 
 export type CustomTitleInput = {
   title: unknown;
   sortTitle?: unknown;
   mediaType: unknown;
-  releaseDate?: unknown;
+  releaseYear?: unknown;
   overview?: unknown;
   genres?: unknown;
   director?: unknown;
@@ -14,7 +15,7 @@ export type NormalizedCustomTitle = {
   title: string;
   sortTitle: string;
   mediaType: MediaType;
-  releaseDate: string | null;
+  releaseYear: number;
   overview: string;
   genres: string[];
   director: string;
@@ -22,7 +23,8 @@ export type NormalizedCustomTitle = {
 
 export class CustomTitleInputError extends Error {
   constructor(
-    readonly field: "title" | "mediaType" | "releaseDate" | "overview" | "genres" | "director",
+    readonly field:
+      "title" | "sortTitle" | "mediaType" | "releaseYear" | "overview" | "genres" | "director",
     message: string,
   ) {
     super(message);
@@ -34,24 +36,10 @@ function readOptionalString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function getSuggestedSortTitle(title: string) {
-  return title.replace(/^(a|an|the)\s+/i, "").trim() || title;
-}
-
-function isValidDateOnly(value: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return false;
-  }
-
-  const date = new Date(`${value}T00:00:00.000Z`);
-  return !Number.isNaN(date.valueOf()) && date.toISOString().slice(0, 10) === value;
-}
-
 export function normalizeCustomTitleInput(input: CustomTitleInput): NormalizedCustomTitle {
   const title = readOptionalString(input.title);
   const mediaType = readOptionalString(input.mediaType);
   const sortTitle = readOptionalString(input.sortTitle);
-  const releaseDate = readOptionalString(input.releaseDate);
   const overview = readOptionalString(input.overview);
   const genresText = readOptionalString(input.genres);
   const director = readOptionalString(input.director);
@@ -63,12 +51,28 @@ export function normalizeCustomTitleInput(input: CustomTitleInput): NormalizedCu
     throw new CustomTitleInputError("title", "Title must be 200 characters or fewer.");
   }
 
+  if (!sortTitle) {
+    throw new CustomTitleInputError("sortTitle", "Enter a sort title.");
+  }
+  if (sortTitle.length > 200) {
+    throw new CustomTitleInputError("sortTitle", "Sort title must be 200 characters or fewer.");
+  }
+
   if (mediaType !== "movie" && mediaType !== "series") {
     throw new CustomTitleInputError("mediaType", "Choose Movie or TV series.");
   }
 
-  if (releaseDate && !isValidDateOnly(releaseDate)) {
-    throw new CustomTitleInputError("releaseDate", "Enter a valid release date.");
+  let releaseYear: number | null;
+  try {
+    releaseYear = normalizeReleaseYearInput(input.releaseYear);
+  } catch (error) {
+    if (error instanceof ReleaseYearInputError) {
+      throw new CustomTitleInputError("releaseYear", error.message);
+    }
+    throw error;
+  }
+  if (releaseYear === null) {
+    throw new CustomTitleInputError("releaseYear", "Enter a release year.");
   }
   if (overview.length > 5000) {
     throw new CustomTitleInputError("overview", "Overview must be 5,000 characters or fewer.");
@@ -101,9 +105,9 @@ export function normalizeCustomTitleInput(input: CustomTitleInput): NormalizedCu
 
   return {
     title,
-    sortTitle: sortTitle || getSuggestedSortTitle(title),
+    sortTitle,
     mediaType,
-    releaseDate: releaseDate || null,
+    releaseYear,
     overview,
     genres,
     director,

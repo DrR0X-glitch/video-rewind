@@ -4,6 +4,10 @@ Next.js app for the Video Rewind public site and inventory UI. The app owns the 
 
 ## Development
 
+### Parallel agent work
+
+Use agents proactively when a task has independent, clearly bounded pieces that can safely proceed in parallel; no extra user instruction is needed. Give each agent an explicit scope, avoid overlapping edits to shared files, and review every agent's changes and verification before considering the task complete. Keep coordination and integration with the primary task owner.
+
 1. Copy the example env file for the app and Docker Compose:
 
 ```bash
@@ -68,7 +72,7 @@ The normal migration command will not replay the baseline against a database tha
 pnpm db:migrate:baseline
 ```
 
-For future schema changes, add a new numbered SQL file under `db/migrations/` and run `pnpm db:migrate`. Never edit a migration after it has been applied; add another migration instead.
+For future schema changes, add a new numbered SQL file under `db/migrations/` and run `pnpm db:migrate`. A migration may be revised while its branch is unmerged to `main`; reset and reseed affected local development databases so they apply the revised file from scratch. After merge, treat the migration as applied in production: never edit it, and add a new migration for later changes. Never reset a production database.
 
 ### Local database tests
 
@@ -147,13 +151,15 @@ pnpm import:stock -- ./path/to/stock.csv --verbose
 - `/contact`
 - `/movies/:id`
 - `/inventory`
+- `/inventory/cds`
+- `/inventory/cds/releases/:id`
 - `/inventory/:id`
 - `/inventory/:id/edit`
 - `/inventory/discs/:id`
-- `/inventory/discs/:id/label`
 - `/inventory/new`
 - `/inventory/review`
 - `/inventory/stock`
+- `/inventory/stock/cds`
 
 ## API Routes
 
@@ -180,12 +186,12 @@ pnpm import:stock -- ./path/to/stock.csv --verbose
 - TMDB collections are stored separately and only link to titles that already exist locally. Creating one title will not auto-create sibling titles.
 - The `backfill:collections` script fills missing TMDB collection links for existing movie titles. CSV stock import does not currently create collection links during import.
 - Inventory routes use a separate nav: `Homepage`, `Titles`, `Stock`, `Review`, `New`.
-- Each disc gets a six-digit internal `inventory_code` when it is created. Label workflows print that existing code; they do not allocate a new one later.
+- Each disc gets a six-digit internal `inventory_code` when it is created. It identifies the copy inside the app and is not printed as a barcode.
+- UPC/EAN is optional and stored per physical copy. Repeated codes are allowed; camera scanning is available where the browser supports it, with manual entry as fallback.
 - New discs start as not reviewed, so they stay off the public site until staff review them.
 - `/inventory/stock` now shows reviewed stock only.
 - `/inventory/review` is the unreviewed queue, with shift-range selection, bulk mark-reviewed, bulk delete, per-row review actions, and sort grouped by Primary then Duplicate.
-- Barcode labels are rendered as Code 128 SVG and can be printed from disc and stock workflows.
-- The stock view is a searchable, sortable disc table for reviewed stock with preset links for `All Discs` and `Wall`, visible filters including `Primary`, shift-range row selection, bulk edit/delete actions, pagination, and a `Show All` mode.
+- `/inventory/stock` is a searchable, sortable table for reviewed movie/VHS stock with preset links for `All Discs` and `Wall`, visible filters including `Primary`, shift-range row selection, bulk edit/delete actions, pagination, and a `Show All` mode. CDs are excluded from the standard stock and review views and use the dedicated, no-art `/inventory/stock/cds` view with release and copy-specific fields.
 - Primary/duplicate status is calculated automatically from highest format quality (`4K UHD`, `Blu-ray`, `DVD`) and then lowest `inventory_code`.
 - The public homepage uses horizontal browse rows for featured titles, highest rated movies, popular movies, popular TV, recently returned, and top genres, with a compact search form in the intro panel.
 - Titles can be marked `Hide from homepage` by staff to keep niche items such as concert recordings out of homepage rails without removing them from public search or detail pages.

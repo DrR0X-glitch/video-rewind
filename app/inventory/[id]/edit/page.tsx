@@ -1,5 +1,6 @@
 import { saveTitleEdits } from "@/app/inventory/actions";
 import { getMovieById } from "@/lib/data";
+import { RequiredTitleMetadataFields } from "@/components/required-title-metadata-fields";
 
 export const dynamic = "force-dynamic";
 
@@ -18,24 +19,20 @@ export default async function InventoryEditTitlePage(props: PageProps<"/inventor
         </div>
 
         <form action={saveTitleEdits.bind(null, movie.id)} className="stack-form">
-          <label>
-            <span>Title</span>
-            <input type="text" name="title" defaultValue={movie.title} required />
-          </label>
-          <label>
-            <span>Sort title</span>
-            <input type="text" name="sortTitle" defaultValue={movie.sortTitle} required />
-          </label>
+          <RequiredTitleMetadataFields
+            titleName="title"
+            sortTitleName="sortTitle"
+            releaseYearName="releaseYear"
+            titleDefaultValue={movie.title}
+            sortTitleDefaultValue={movie.sortTitle}
+            releaseYearDefaultValue={String(movie.releaseYear)}
+          />
           <label>
             <span>Type</span>
             <select name="mediaType" defaultValue={movie.mediaType}>
               <option value="movie">Movie</option>
               <option value="series">Series</option>
             </select>
-          </label>
-          <label>
-            <span>Release date</span>
-            <input type="date" name="releaseDate" defaultValue={movie.releaseDate} />
           </label>
           <label>
             <span>Genres</span>
@@ -55,7 +52,7 @@ export default async function InventoryEditTitlePage(props: PageProps<"/inventor
           </label>
           <label className="checkbox-row">
             <input type="checkbox" name="featured" value="true" defaultChecked={movie.featured} />
-            <span>Featured</span>
+            <span>Featured?</span>
           </label>
           <label className="checkbox-row">
             <input
@@ -64,7 +61,7 @@ export default async function InventoryEditTitlePage(props: PageProps<"/inventor
               value="true"
               defaultChecked={movie.hideFromHomepage}
             />
-            <span>Hide from homepage</span>
+            <span>Hide from homepage?</span>
           </label>
           <button type="submit">Save Title</button>
         </form>

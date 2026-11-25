@@ -13,10 +13,16 @@ type InventoryZoneRow = {
   code: string;
   label: string;
   is_active: boolean;
+  item_count?: number;
 };
 
 function toInventoryZone(row: InventoryZoneRow): InventoryZone {
-  return { code: row.code, label: row.label, isActive: row.is_active };
+  return {
+    code: row.code,
+    label: row.label,
+    isActive: row.is_active,
+    itemCount: Number(row.item_count ?? 0),
+  };
 }
 
 export async function listInventoryZones(options?: {
@@ -25,8 +31,9 @@ export async function listInventoryZones(options?: {
 }): Promise<InventoryZone[]> {
   const result = await pool.query<InventoryZoneRow>(
     `
-      SELECT code, label, is_active
-      FROM inventory_zones
+      SELECT z.code, z.label, z.is_active,
+        (SELECT COUNT(*)::INT FROM inventory_items i WHERE i.zone = z.code) AS item_count
+      FROM inventory_zones z
       WHERE ($1::boolean = FALSE OR is_active = TRUE OR code = $2)
       ORDER BY sort_order ASC, code ASC;
     `,
@@ -34,6 +41,38 @@ export async function listInventoryZones(options?: {
   );
 
   return result.rows.map(toInventoryZone);
+}
+
+export async function deleteEmptyInventoryZone(codeValue: unknown) {
+  const code = parseInventoryZoneIdentifier(codeValue);
+  if (!code) throw createHttpError(400, "Zone code is invalid.");
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const zones = await client.query<InventoryZoneRow>(
+      "SELECT code, label, is_active FROM inventory_zones ORDER BY code FOR UPDATE",
+    );
+    const zone = zones.rows.find((item) => item.code === code);
+    if (!zone) throw createHttpError(404, "Zone not found.");
+    const copies = await client.query<{ count: number }>(
+      "SELECT COUNT(*)::INT AS count FROM inventory_items WHERE zone = $1",
+      [code],
+    );
+    if (Number(copies.rows[0]?.count ?? 0) > 0) {
+      throw createHttpError(409, "Move all discs out of this zone before permanently deleting it.");
+    }
+    if (zone.is_active && zones.rows.filter((item) => item.is_active).length <= 1) {
+      throw createHttpError(409, "At least one active zone must remain.");
+    }
+    await client.query("DELETE FROM inventory_zones WHERE code = $1", [code]);
+    await client.query("COMMIT");
+    return { code };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function assertInventoryZoneIsAssignable(code: string, inventoryItemId?: string) {

@@ -102,6 +102,7 @@ export async function POST(request: Request) {
           : "movie",
       title: requireString(body.title, "title"),
       sortTitle: requireString(body.sort_title, "sort_title"),
+      releaseYear: body.release_year,
       overview: typeof body.overview === "string" ? body.overview : "",
       releaseDate: typeof body.release_date === "string" ? body.release_date : "",
       posterPath: typeof body.poster_path === "string" ? body.poster_path : null,

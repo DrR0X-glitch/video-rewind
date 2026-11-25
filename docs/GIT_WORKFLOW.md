@@ -12,6 +12,8 @@ Examples: `feature/manage-locations`, `bugfix/stock-selection`, `chore/versioned
 
 Use only these three prefixes for ordinary work. Do not add release, hotfix, ticket, or agent prefixes unless the user asks. Keep a branch as broad as a cohesive change: one branch can contain multiple related features or bugs intended for the same review and merge; split unrelated work when it makes review or rollback clearer.
 
+When the user requests a whole-update integration branch, name it `release/YYYY-MM` using the month it is created. Create it from the current feature tip that contains the intended changes not yet on `main`. Rebase or merge further feature branches onto this release branch, resolve conflicts there, and run the full local verification gate on the assembled release branch. Merge that branch to `main` once after review and passing checks. The release branch is a temporary integration target, not a version or deployment tag.
+
 This follows the purpose-prefix and lowercase kebab-case approach in [Conventional Branch](https://conventionalbranch.org/), using only the development prefixes needed for this repository.
 
 ## Working rules
@@ -24,6 +26,13 @@ This follows the purpose-prefix and lowercase kebab-case approach in [Convention
 6. Merge only when every required check passes. If a check fails or was not run, fix it or report the blocker; do not treat it as a pass.
 7. Run the full verification gate again on `main` after the merge. No CI is configured or required by this workflow.
 8. Remove the completed task from `docs/IN_PROGRESS.md` before the commit that completes it; record remaining work as separate active or backlog items.
+
+## Migration lifecycle
+
+- A numbered migration may be edited while its feature branch is still unmerged to `main`.
+- If an edited migration was applied to a local development database, reset and reseed only that local database before applying it again.
+- Once a branch containing a migration is merged to `main`, treat that migration as already applied in production. Never edit it after merge; add a new numbered migration for later changes.
+- Never reset a production database. Production upgrades run forward through migrations while preserving its data.
 
 ## Local verification gate
 

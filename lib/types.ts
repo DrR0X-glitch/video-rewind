@@ -1,4 +1,5 @@
-export type DiscFormat = "dvd" | "blu-ray" | "4k-uhd";
+export type DiscFormat = "dvd" | "blu-ray" | "4k-uhd" | "vhs" | "cd";
+export type PublicDiscFormat = Exclude<DiscFormat, "vhs" | "cd">;
 export type MediaType = "movie" | "series";
 
 export type Movie = {
@@ -11,6 +12,7 @@ export type Movie = {
   sortTitle: string;
   overview: string;
   releaseDate: string;
+  releaseYear: number;
   posterUrl?: string | null;
   posterColor: string;
   genres: string[];
@@ -26,10 +28,23 @@ export type LinkedTitle = {
   sortTitle: string;
   mediaType: MediaType;
   releaseDate: string;
+  releaseYear: number;
+  posterUrl?: string | null;
   seasonStart?: number;
   seasonEnd?: number;
   episodeStart?: number;
   episodeEnd?: number;
+};
+
+export type LinkedMusicRelease = {
+  id: string;
+  source: "discogs" | "manual";
+  discogsReleaseId: number | null;
+  title: string;
+  sortTitle: string;
+  artistCredit: string;
+  releaseYear: number | null;
+  discogsUrl: string | null;
 };
 
 export type TitleCollection = {
@@ -41,6 +56,7 @@ export type TitleCollection = {
 export type InventoryItem = {
   id: string;
   inventoryCode: string;
+  upcEan: string | null;
   format: DiscFormat;
   availability: boolean;
   reviewed: boolean;
@@ -51,6 +67,7 @@ export type InventoryItem = {
   row: string;
   locationCode: string;
   linkedTitles: LinkedTitle[];
+  linkedMusicRelease?: LinkedMusicRelease;
   notes?: string;
   lastRentedAt?: string;
   dayPrice: number;
@@ -58,6 +75,8 @@ export type InventoryItem = {
   lateClass: number;
   updatedAt?: string;
 };
+
+export type PublicInventoryItem = Omit<InventoryItem, "format"> & { format: PublicDiscFormat };
 
 export type StockViewDisc = InventoryItem & {
   collectionName?: string;
@@ -83,4 +102,8 @@ export type MovieWithInventory = Movie & {
   totalCopies: number;
   collection?: TitleCollection;
   collectionTitles: LinkedTitle[];
+};
+
+export type PublicMovieWithInventory = Omit<MovieWithInventory, "inventoryItems"> & {
+  inventoryItems: PublicInventoryItem[];
 };

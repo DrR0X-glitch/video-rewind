@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { updateInventoryItemInDatabase } from "@/lib/server/store";
+import { updateInventoryItemInDatabase } from "@/lib/server/inventory/items";
 import { ensureObject, jsonError } from "@/lib/server/http";
 
 export async function PATCH(request: Request, context: RouteContext<"/api/inventory/[id]">) {

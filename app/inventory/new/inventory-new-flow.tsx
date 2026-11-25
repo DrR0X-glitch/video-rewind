@@ -10,9 +10,11 @@ import {
   createTitleOnly,
 } from "@/app/inventory/new/actions";
 import { PosterSwatch } from "@/components/poster-swatch";
+import { UpcEanInput } from "@/components/upc-ean-input";
 import { formatZoneLabel } from "@/lib/constants";
 import { formatLinkedTitleLabel, formatMediaType, formatMovieTitleWithYear } from "@/lib/format";
 import type { InventoryZone } from "@/lib/inventory-zones";
+import { RequiredTitleMetadataFields } from "@/components/required-title-metadata-fields";
 import type { MovieWithInventory } from "@/lib/types";
 import type { TmdbTitleDraft } from "@/lib/server/tmdb";
 
@@ -22,7 +24,7 @@ const SELECTED_TITLE_GRID_LIMIT = 6;
 
 type DiscDraft = {
   availability: boolean;
-  format: "dvd" | "blu-ray" | "4k-uhd";
+  format: "dvd" | "blu-ray" | "4k-uhd" | "vhs";
   sealed: boolean;
   zone: string;
   row: string;
@@ -30,7 +32,6 @@ type DiscDraft = {
   weekendPrice: string;
   lateClass: string;
   notes: string;
-  generateBarcode: boolean;
 };
 
 type DiscDefaults = Pick<DiscDraft, "format" | "sealed" | "zone" | "row"> & {
@@ -59,7 +60,6 @@ const DEFAULT_DISC_DRAFT: DiscDraft = {
   weekendPrice: "0",
   lateClass: "0",
   notes: "",
-  generateBarcode: false,
 };
 
 type InventoryNewFlowProps = {
@@ -129,7 +129,8 @@ export function InventoryNewFlow({
           format:
             parsedDefaults.format === "dvd" ||
             parsedDefaults.format === "4k-uhd" ||
-            parsedDefaults.format === "blu-ray"
+            parsedDefaults.format === "blu-ray" ||
+            parsedDefaults.format === "vhs"
               ? parsedDefaults.format
               : DEFAULT_DISC_DRAFT.format,
           sealed:
@@ -150,7 +151,6 @@ export function InventoryNewFlow({
           weekendPrice: DEFAULT_DISC_DRAFT.weekendPrice,
           lateClass: DEFAULT_DISC_DRAFT.lateClass,
           notes: DEFAULT_DISC_DRAFT.notes,
-          generateBarcode: DEFAULT_DISC_DRAFT.generateBarcode,
         });
         setSectionOverride(
           typeof parsedDefaults.sectionOverride === "string" &&
@@ -385,7 +385,7 @@ export function InventoryNewFlow({
   function renderSelectedMovie(movie: MovieWithInventory) {
     const titleLabel = formatLinkedTitleLabel({
       title: movie.title,
-      releaseDate: movie.releaseDate,
+      releaseYear: movie.releaseYear,
       mediaType: movie.mediaType,
       seasonStart: seasonDrafts[movie.id]?.seasonStart
         ? Number.parseInt(seasonDrafts[movie.id].seasonStart, 10)
@@ -470,7 +470,7 @@ export function InventoryNewFlow({
 
                       return (
                         <li key={movie.id}>
-                          <span>{formatMovieTitleWithYear(movie.title, movie.releaseDate)}</span>
+                          <span>{formatMovieTitleWithYear(movie.title, movie.releaseYear)}</span>
                           <span className="muted">
                             {formatMediaType(movie.mediaType)} | {movie.totalCopies} copies
                           </span>
@@ -512,7 +512,7 @@ export function InventoryNewFlow({
                     <span>
                       {formatLinkedTitleLabel({
                         title: movie.title,
-                        releaseDate: movie.releaseDate,
+                        releaseYear: movie.releaseYear,
                         mediaType: movie.mediaType,
                         seasonStart: seasonDrafts[movie.id]?.seasonStart
                           ? Number.parseInt(seasonDrafts[movie.id].seasonStart, 10)
@@ -570,7 +570,7 @@ export function InventoryNewFlow({
         <>
           <section className="panel section">
             <h2>2. Resolve Title from TMDB</h2>
-            <form className="stack-form">
+            <form className="stack-form cd-search-form">
               <label>
                 TMDB link
                 <input
@@ -588,7 +588,7 @@ export function InventoryNewFlow({
             <section className="panel section">
               <h2>Existing Match Found</h2>
               <p className="selected-title">
-                {formatMovieTitleWithYear(duplicateMovie.title, duplicateMovie.releaseDate)}
+                {formatMovieTitleWithYear(duplicateMovie.title, duplicateMovie.releaseYear)}
               </p>
               <p className="muted">
                 This TMDB title already exists in the catalogue. Add the disc to the existing title
@@ -607,22 +607,22 @@ export function InventoryNewFlow({
               <section className="panel section">
                 <h2>TMDB Title Setup</h2>
                 <div className="stack-form">
-                  <label>
-                    Title
-                    <input type="text" name="title" defaultValue={title} />
-                  </label>
-                  <label>
-                    Sort title
-                    <input type="text" name="sortTitle" defaultValue={suggestedSortTitle} />
-                  </label>
+                  <RequiredTitleMetadataFields
+                    titleName="title"
+                    sortTitleName="sortTitle"
+                    releaseYearName="releaseYear"
+                    titleDefaultValue={title}
+                    sortTitleDefaultValue={suggestedSortTitle}
+                    releaseYearDefaultValue={tmdbDraft.releaseDate.slice(0, 4)}
+                  />
                   <dl className="meta-list compact-meta info-list">
                     <div>
                       <dt>Type</dt>
                       <dd>{formatMediaType(tmdbDraft.mediaType)}</dd>
                     </div>
                     <div>
-                      <dt>Release date</dt>
-                      <dd>{tmdbDraft.releaseDate || "—"}</dd>
+                      <dt>Source release date</dt>
+                      <dd>{tmdbDraft.releaseDate || "Unavailable; enter a release year above."}</dd>
                     </div>
                     <div>
                       <dt>Director / creator</dt>
@@ -659,24 +659,17 @@ export function InventoryNewFlow({
             ) : null}
             <form action={createCustomTitleForNewDisc} className="stack-form">
               <input type="hidden" name="titleIds" value={selectedTitleIdsValue} />
-              <label>
-                Title
-                <input type="text" name="customTitle" required maxLength={200} />
-              </label>
-              <label>
-                Sort title (optional)
-                <input type="text" name="customSortTitle" maxLength={200} />
-              </label>
+              <RequiredTitleMetadataFields
+                titleName="customTitle"
+                sortTitleName="customSortTitle"
+                releaseYearName="customReleaseYear"
+              />
               <label>
                 Type
                 <select name="customMediaType" defaultValue="movie" required>
                   <option value="movie">Movie</option>
                   <option value="series">TV series</option>
                 </select>
-              </label>
-              <label>
-                Release date (optional)
-                <input type="date" name="customReleaseDate" />
               </label>
               <label>
                 Director / creator (optional)
@@ -703,10 +696,12 @@ function getCustomTitleErrorMessage(error: string) {
   switch (error) {
     case "title":
       return "Enter a title of 200 characters or fewer.";
+    case "sortTitle":
+      return "Enter a sort title of 200 characters or fewer.";
     case "mediaType":
       return "Choose Movie or TV series.";
-    case "releaseDate":
-      return "Enter a valid release date.";
+    case "releaseYear":
+      return "Enter a release year between 1000 and 9999.";
     case "overview":
       return "Overview must be 5,000 characters or fewer.";
     case "genres":
@@ -780,6 +775,16 @@ function DiscFields({
             />
             <span>4K UHD</span>
           </label>
+          <label className="choice-button">
+            <input
+              type="radio"
+              name="format"
+              value="vhs"
+              checked={discDraft.format === "vhs"}
+              onChange={() => setDiscDraft((currentDraft) => ({ ...currentDraft, format: "vhs" }))}
+            />
+            <span>VHS</span>
+          </label>
         </span>
       </label>
       <label>
@@ -851,7 +856,7 @@ function DiscFields({
               }))
             }
           />
-          <span>Available</span>
+          <span>Available?</span>
         </label>
         <label className="checkbox-row">
           <input
@@ -866,42 +871,53 @@ function DiscFields({
               }))
             }
           />
-          <span>Sealed</span>
+          <span>Sealed?</span>
         </label>
       </div>
-      <label>
-        Day price
-        <input
-          type="text"
-          name="dayPrice"
-          value={discDraft.dayPrice}
-          onChange={(event) =>
-            setDiscDraft((currentDraft) => ({ ...currentDraft, dayPrice: event.target.value }))
-          }
-        />
-      </label>
-      <label>
-        Weekend price
-        <input
-          type="text"
-          name="weekendPrice"
-          value={discDraft.weekendPrice}
-          onChange={(event) =>
-            setDiscDraft((currentDraft) => ({ ...currentDraft, weekendPrice: event.target.value }))
-          }
-        />
-      </label>
-      <label>
-        Late class
-        <input
-          type="text"
-          name="lateClass"
-          value={discDraft.lateClass}
-          onChange={(event) =>
-            setDiscDraft((currentDraft) => ({ ...currentDraft, lateClass: event.target.value }))
-          }
-        />
-      </label>
+      <div className="price-field-row">
+        <label>
+          Day price
+          <input
+            type="number"
+            name="dayPrice"
+            min="0"
+            step="0.01"
+            value={discDraft.dayPrice}
+            onChange={(event) =>
+              setDiscDraft((currentDraft) => ({ ...currentDraft, dayPrice: event.target.value }))
+            }
+          />
+        </label>
+        <label>
+          Weekend price
+          <input
+            type="number"
+            name="weekendPrice"
+            min="0"
+            step="0.01"
+            value={discDraft.weekendPrice}
+            onChange={(event) =>
+              setDiscDraft((currentDraft) => ({
+                ...currentDraft,
+                weekendPrice: event.target.value,
+              }))
+            }
+          />
+        </label>
+        <label>
+          Late class
+          <input
+            type="number"
+            name="lateClass"
+            min="0"
+            step="1"
+            value={discDraft.lateClass}
+            onChange={(event) =>
+              setDiscDraft((currentDraft) => ({ ...currentDraft, lateClass: event.target.value }))
+            }
+          />
+        </label>
+      </div>
       {selectedMovies.map((movie) => {
         const seasonDraft = seasonDrafts[movie.id] ?? {
           seasonStart: "",
@@ -1017,21 +1033,7 @@ function DiscFields({
           }
         />
       </label>
-      <label className="checkbox-row">
-        <input
-          type="checkbox"
-          name="generateBarcode"
-          value="true"
-          checked={discDraft.generateBarcode}
-          onChange={(event) =>
-            setDiscDraft((currentDraft) => ({
-              ...currentDraft,
-              generateBarcode: event.target.checked,
-            }))
-          }
-        />
-        <span>Open label after save</span>
-      </label>
+      <UpcEanInput />
     </>
   );
 }

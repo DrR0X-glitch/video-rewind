@@ -468,6 +468,7 @@ async function main() {
               title,
               sort_title,
               overview,
+              release_year,
               release_date,
               poster_path,
               genres,
@@ -476,7 +477,7 @@ async function main() {
               featured,
               hide_from_homepage
             )
-            VALUES ($1, $2, $3, $4::title_media_type, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13, $14)
+            VALUES ($1, $2, $3, $4::title_media_type, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14, $15)
             RETURNING id;
           `,
           [
@@ -487,6 +488,7 @@ async function main() {
             title.title,
             normalizeSortTitle(title.title),
             title.overview,
+            Number(title.releaseDate.slice(0, 4)),
             title.releaseDate,
             title.posterPath,
             title.genres,

@@ -7,8 +7,8 @@ import {
   formatAvailability,
   formatImdbRating,
   formatMediaType,
-  formatLongDate,
   formatMovieTitleWithYear,
+  formatReleaseYear,
   formatDiscFormat,
   getAvailabilityLabel,
 } from "@/lib/format";
@@ -45,7 +45,7 @@ export default async function MovieDetailPage(props: PageProps<"/movies/[id]">) 
           <PosterSwatch title={movie.title} color={movie.posterColor} size="detail" />
         )}
         <section className="detail-copy">
-          <h1>{formatMovieTitleWithYear(movie.title, movie.releaseDate)}</h1>
+          <h1>{formatMovieTitleWithYear(movie.title, movie.releaseYear)}</h1>
           <p className="muted">
             {formatMediaType(movie.mediaType)} | Sort title: {movie.sortTitle}
           </p>
@@ -53,7 +53,7 @@ export default async function MovieDetailPage(props: PageProps<"/movies/[id]">) 
           <dl className="meta-list">
             <div>
               <dt>{movie.mediaType === "series" ? "First aired" : "Released"}</dt>
-              <dd>{formatLongDate(movie.releaseDate)}</dd>
+              <dd>{formatReleaseYear(movie.releaseYear)}</dd>
             </div>
             <div>
               <dt>Genres</dt>
@@ -108,11 +108,11 @@ export default async function MovieDetailPage(props: PageProps<"/movies/[id]">) 
                   <li key={title.id}>
                     {title.id === movie.id ? (
                       <span className="detail-collection-current">
-                        {formatMovieTitleWithYear(title.title, title.releaseDate)}
+                        {formatMovieTitleWithYear(title.title, title.releaseYear)}
                       </span>
                     ) : (
                       <Link href={`/movies/${title.id}`}>
-                        {formatMovieTitleWithYear(title.title, title.releaseDate)}
+                        {formatMovieTitleWithYear(title.title, title.releaseYear)}
                       </Link>
                     )}
                   </li>
@@ -126,12 +126,14 @@ export default async function MovieDetailPage(props: PageProps<"/movies/[id]">) 
   );
 }
 
-function getFormatPriority(format: "dvd" | "blu-ray" | "4k-uhd") {
+function getFormatPriority(format: "dvd" | "blu-ray" | "4k-uhd" | "vhs") {
   switch (format) {
     case "4k-uhd":
       return 0;
     case "blu-ray":
       return 1;
+    case "vhs":
+      return 3;
     default:
       return 2;
   }
