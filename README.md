@@ -15,7 +15,7 @@ cp .env.example .env.local
 cp .env.example .env
 ```
 
-The Compose PostgreSQL service publishes on port `5432`.
+`APP_PORT` sets the host port for the app container (default `3000`); the app listens on port `3000` inside the container. PostgreSQL stays private to the Compose network by default. Local database commands use `docker-compose.dev.yml` to publish Postgres on `127.0.0.1:5432` for host-based development tools. Do not include that development override in staging or production.
 
 Add your TMDB read token to `.env.local`:
 
@@ -60,9 +60,9 @@ This is also the reset command. It clears catalogue and inventory records and re
 pnpm dev
 ```
 
-Open `http://localhost:3000`.
+Open `http://localhost:3000` by default, or use the host port configured by `APP_PORT`.
 
-`pnpm db:down` stops the Compose services while keeping the local database volume. To deliberately discard the local database and start fresh, run `docker compose down -v`, then repeat the setup steps.
+`pnpm db:down` stops the Compose services while keeping the local database volume. To deliberately discard the local database and start fresh, run `docker compose -f docker-compose.yml -f docker-compose.dev.yml down -v`, then repeat the setup steps.
 
 ### Existing local database
 
@@ -94,13 +94,13 @@ pnpm exec next start --hostname 0.0.0.0 --port 3000
 For a containerized local deployment with Postgres:
 
 ```bash
-docker compose up -d postgres
-docker compose run --rm db-migrate
-docker compose run --rm db-seed
-docker compose up --build app
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres
+docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile tools run --rm db-migrate
+docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile tools run --rm db-seed
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build app
 ```
 
-The app will be available on `http://localhost:3000`. Migrations and sample seeding are explicit local commands; the application container does not modify the database schema or seed records on startup. Compose credentials are for local development only.
+The app will be available on the configured `APP_PORT` (default `3000`). Migrations and sample seeding are explicit local commands; the application container does not modify the database schema or seed records on startup. Compose credentials are for local development only.
 Provide `TMDB_API_READ_ACCESS_TOKEN` and `OMDB_API_KEY` through your shell environment or a Compose `.env` file if you need TMDB/OMDb-backed title creation.
 
 To backfill missing IMDb ids and ratings on existing titles:
