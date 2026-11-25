@@ -25,8 +25,8 @@
     "backfill:imdb": "node --env-file=.env.local scripts/backfill-imdb.mjs",
     "backfill:collections": "node --env-file=.env.local scripts/backfill-collections.mjs",
     "import:stock": "node --env-file=.env.local scripts/import-stock-csv.mjs",
-    "db:up": "docker compose up -d --wait postgres",
-    "db:down": "docker compose down"
+    "db:up": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --wait postgres",
+    "db:down": "docker compose -f docker-compose.yml -f docker-compose.dev.yml down"
   },
   "dependencies": {
     "@zxing/browser": "^0.2.1",
